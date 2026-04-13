@@ -5,6 +5,7 @@ using System.Data;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -54,6 +55,13 @@ namespace DatEditorVDGrid
                 Name = "Editable",
                 HeaderText = "Editable"
             });
+            dgvColumns.Columns.Add("Format", "Formato");
+
+            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
+            {
+                Name = "Ellipsis",
+                HeaderText = "Ellipsis"
+            });
         }
 
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
@@ -80,6 +88,8 @@ namespace DatEditorVDGrid
             var required = new List<string>();
             var headers = new List<string>();
             var widths = new List<string>();
+            var formats = new List<string>();
+            var ellipsisList = new List<string>();
 
             foreach (var row in filas)
             {
@@ -93,6 +103,9 @@ namespace DatEditorVDGrid
                 string header = row.Cells["Header"].Value?.ToString() ?? "";
                 string width = row.Cells["Width"].Value?.ToString() ?? "0";
 
+                string format = row.Cells["Format"].Value?.ToString() ?? "0";
+                bool ellipsis = Convert.ToBoolean(row.Cells["Ellipsis"].Value ?? false);
+
                 // si alias está vacío, no añadir espacio extra
                 selectParts.Add(string.IsNullOrWhiteSpace(alias) ? $"{campo}" : $"{campo} {alias}");
                 dataTypes.Add(tipo);
@@ -100,6 +113,8 @@ namespace DatEditorVDGrid
                 required.Add(req ? "1" : "0");
                 headers.Add(header);
                 widths.Add(width);
+                formats.Add(format);
+                ellipsisList.Add(ellipsis ? "1" : "0");
             }
 
             // construir SELECT respetando que los campos no contengan coma adicional
@@ -150,6 +165,8 @@ namespace DatEditorVDGrid
                 .Select(r => r.Cells["Alias"].Value?.ToString())
             );
             AppendWrappedProperty(sb, "ColsToEdit", colsToEdit);
+            AppendWrappedProperty(sb, "FormatStrings", string.Join("~", formats));
+            AppendWrappedProperty(sb, "EllipsisWhichOnes", string.Join(",", ellipsisList));
 
             txtOutput.Text = sb.ToString();
         }
@@ -266,6 +283,8 @@ namespace DatEditorVDGrid
             var req = data.ContainsKey("RequiredFields") ? data["RequiredFields"].Split(',') : new string[0];
             var headers = data.ContainsKey("Headers") ? data["Headers"].Split(',') : new string[0];
             var widths = data.ContainsKey("Widths") ? data["Widths"].Split(',') : new string[0];
+            var formats = data.ContainsKey("FormatStrings") ? data["FormatStrings"].Split('~') : new string[0];
+            var ellipsis = data.ContainsKey("EllipsisWhichOnes") ? data["EllipsisWhichOnes"].Split(',') : new string[0];
 
             for (int i = 0; i < campos.Count; i++)
             {
@@ -294,6 +313,12 @@ namespace DatEditorVDGrid
 
                 if (i < widths.Length)
                     dgvColumns.Rows[rowIndex].Cells["Width"].Value = widths[i];
+
+                if (i < formats.Length)
+                    dgvColumns.Rows[rowIndex].Cells["Format"].Value = formats[i];
+
+                if (i < ellipsis.Length)
+                    dgvColumns.Rows[rowIndex].Cells["Ellipsis"].Value = ellipsis[i] == "1";
             }
 
             MessageBox.Show("DAT cargado correctamente");
@@ -477,6 +502,59 @@ namespace DatEditorVDGrid
 
             // tokens[0] es la tabla principal (puede ser schema.table)
             return tokens[0];
+        }
+
+        private void txtFromJoins_TextChanged(object sender, EventArgs e)
+        {
+
+            // Solo procesar si el último carácter es un espacio o si se borró texto
+            if (txtFromJoins.Text.Length > 0 &&
+                txtFromJoins.Text[txtFromJoins.Text.Length - 1] != ' ' && !txtFromJoins.Text.EndsWith("\n"))
+            {
+                return;
+            }
+
+            // Keywords SQL para FROM/JOINs
+            string[] keywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
+            Color joinColor = Color.Blue;
+            Color keywordColor = Color.Green;
+
+            // Guardar posición/selección actual
+            int selStart = txtFromJoins.SelectionStart;
+            int selLength = txtFromJoins.SelectionLength;
+
+            // Resetear colores a negro
+            txtFromJoins.SelectAll();
+            txtFromJoins.SelectionColor = Color.Black;
+
+            string text = txtFromJoins.Text ?? "";
+
+            foreach (string kw in keywords)
+            {
+                string pattern = $@"\b{Regex.Escape(kw)}\b";
+                foreach (Match m in Regex.Matches(text, pattern, RegexOptions.IgnoreCase))
+                {
+                    txtFromJoins.Select(m.Index, m.Length);
+                    if (string.Equals(kw, "ON", StringComparison.OrdinalIgnoreCase) || string.Equals(kw, "AS", StringComparison.OrdinalIgnoreCase))
+                        txtFromJoins.SelectionColor = keywordColor;
+                    else
+                        txtFromJoins.SelectionColor = joinColor;
+                }
+            }
+
+            // Restaurar cursor/selección
+            if (selStart >= 0 && selStart <= txtFromJoins.Text.Length)
+            {
+                txtFromJoins.SelectionStart = selStart;
+                txtFromJoins.SelectionLength = selLength;
+            }
+            else
+            {
+                txtFromJoins.SelectionStart = txtFromJoins.Text.Length;
+                txtFromJoins.SelectionLength = 0;
+            }
+            txtFromJoins.SelectionColor = Color.Black;
+            txtFromJoins.DeselectAll();
         }
     }//Form
 }//namespace
