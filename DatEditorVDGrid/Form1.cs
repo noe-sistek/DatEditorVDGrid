@@ -102,12 +102,17 @@ namespace DatEditorVDGrid
                 widths.Add(width);
             }
 
-            //string fullSql = "SELECT " + string.Join(",", selectParts);
-            string fullSql = "SELECT " + string.Join(" ,", selectParts) + " " + txtFromJoins.Text.Trim();
+            // construir SELECT respetando que los campos no contengan coma adicional
+            string selectClause = "SELECT " + string.Join(",", selectParts);
+            string fromJoins = txtFromJoins.Text?.Trim() ?? "";
+            string fullSql = string.IsNullOrWhiteSpace(fromJoins) ? selectClause : (selectClause + " " + fromJoins);
 
             var sb = new StringBuilder();
 
-            // SourceSql (respetando 255 chars por línea)
+            // [Source] header requerido
+            sb.AppendLine("[Source]");
+
+            // SourceSql (respetando 255 chars por línea y sin cortar palabras/campos)
             AppendWrappedProperty(sb, "SourceSql", fullSql);
 
             // Procedimiento fijo
@@ -135,7 +140,7 @@ namespace DatEditorVDGrid
             var filteredHeaders = headers.Where(h => !string.IsNullOrWhiteSpace(h)).ToList();
             AppendWrappedProperty(sb, "Headers", filteredHeaders.Count > 0 ? string.Join(",", filteredHeaders) : "");
 
-            // Widths: mantener todos los valores (si quieres filtrar los vacíos dime)
+            // Widths: mantener todos los valores
             AppendWrappedProperty(sb, "Widths", string.Join(",", widths));
 
             sb.AppendLine($"Editable={(chkEditable.Checked ? "1" : "0")}");
@@ -223,27 +228,39 @@ namespace DatEditorVDGrid
 
             var fullSource = GetFullSourceSql(data);
 
-            SplitSelectFrom(fullSource, out string selectPart, out string fromPart);
+            // separar SELECT vs FROM+JOINS
+            SplitSelectFrom(fullSource, out string selectOnly, out string fromPart);
 
-            // Si viene con "SELECT" al inicio, quitarlo
-            var source = fullSource;
-            if (source.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+            // si el .dat ya trae TableToSave, usarlo; si no, extraer la tabla principal desde FROM
+            if (data.ContainsKey("TableToSave"))
             {
-                source = source.TrimStart().Substring(6);
+                txtTable.Text = data["TableToSave"];
             }
-            source = source.Trim();
+            else
+            {
+                txtTable.Text = ExtractMainTableFromFromPart(fromPart);
+            }
 
-            // llenar textos de configuración si vienen en el .dat
+            // completar controles de configuración desde .dat
             txtWhere.Text = data.ContainsKey("WhereSql") ? data["WhereSql"] : "";
             txtOrder.Text = data.ContainsKey("OrderSql") ? data["OrderSql"] : "";
-            txtTable.Text = data.ContainsKey("TableToSave") ? data["TableToSave"] : "";
             txtKey.Text = data.ContainsKey("KeyField") ? data["KeyField"] : "";
             txtForeign.Text = data.ContainsKey("ForeignKey") ? data["ForeignKey"] : "";
             txtForeignSave.Text = data.ContainsKey("ForeignToSave") ? data["ForeignToSave"] : "";
             chkEditable.Checked = data.ContainsKey("Editable") && data["Editable"] == "1";
-            txtFromJoins.Text = fromPart.Trim();
 
-            var campos = SplitSqlColumns(source);
+            // From+Joins se muestra en txtFromJoins (control para editar o mantener)
+            txtFromJoins.Text = fromPart?.Trim() ?? "";
+
+            // reconstruir lista de campos del SELECT sin el prefijo SELECT
+            var sourceBody = selectOnly ?? fullSource;
+            if (sourceBody.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceBody = sourceBody.TrimStart().Substring(6);
+            }
+            sourceBody = sourceBody.Trim();
+
+            var campos = SplitSqlColumns(sourceBody);
             var dataTypes = data.ContainsKey("DataTypes") ? data["DataTypes"].Split(',') : new string[0];
             var save = data.ContainsKey("FieldsToSave") ? data["FieldsToSave"].Split(',') : new string[0];
             var req = data.ContainsKey("RequiredFields") ? data["RequiredFields"].Split(',') : new string[0];
@@ -328,21 +345,52 @@ namespace DatEditorVDGrid
             return result;
         }
 
-        // Divide una cadena en trozos buscando comas (respetando paréntesis) y preservando
-        // un tamaño máximo por trozo (maxLength). Usada tanto para SQL como para listas separadas por comas.
-        private List<string> SplitSqlIntoLines(string sql, int maxLength = 255)
+        // Divide una cadena en trozos procurando no cortar palabras ni campos:
+        // - Primero intenta partir en la última coma dentro del límite.
+        // - Si no hay coma, busca el último espacio dentro del límite.
+        // - Si no hay donde partir, usa el límite máximo.
+        // El parámetro maxChunkLength se refiere a la longitud máxima permitida para cada trozo
+        // (excluyendo la longitud de la cabecera "Key=" que se maneja en AppendWrappedProperty).
+        private List<string> SplitSqlIntoLines(string sql, int maxChunkLength = 255)
         {
             var result = new List<string>();
 
-            while (sql.Length > maxLength)
+            //if (string.IsNullOrEmpty(sql))
+            //    return result;
+
+            sql = sql.Trim();
+
+            while (sql.Length > maxChunkLength)
             {
-                int splitPos = sql.LastIndexOf(',', maxLength);
+                int searchIndex = Math.Min(maxChunkLength - 1, sql.Length - 1);
 
-                if (splitPos <= 0)
-                    splitPos = maxLength;
+                int commaPos = sql.LastIndexOf(',', searchIndex);
+                if (commaPos > 0)
+                {
+                    // incluir la coma en el chunk; la longitud será commaPos+1 <= maxChunkLength
+                    int len = commaPos + 1;
+                    var chunk = sql.Substring(0, len).Trim();
+                    result.Add(chunk);
+                    sql = sql.Substring(len).Trim();
+                    continue;
+                }
 
-                result.Add(sql.Substring(0, splitPos + 1).Trim());
-                sql = sql.Substring(splitPos + 1).Trim();
+                int spacePos = sql.LastIndexOf(' ', searchIndex);
+                if (spacePos > 0)
+                {
+                    // no incluir el espacio final en el chunk
+                    int len = spacePos;
+                    var chunk = sql.Substring(0, len).Trim();
+                    result.Add(chunk);
+                    sql = sql.Substring(len).Trim();
+                    continue;
+                }
+
+                // no encontramos coma ni espacio, partir en el límite
+                int take = Math.Min(maxChunkLength, sql.Length);
+                var forced = sql.Substring(0, take).Trim();
+                result.Add(forced);
+                sql = sql.Substring(take).Trim();
             }
 
             if (!string.IsNullOrWhiteSpace(sql))
@@ -377,20 +425,58 @@ namespace DatEditorVDGrid
                     sb.AppendLine($"{key}{i + 1}={chunks[i]}");
             }
         }
+
         private void SplitSelectFrom(string fullSql, out string selectPart, out string fromPart)
         {
-            var index = fullSql.ToLower().IndexOf(" from ");
+            selectPart = fullSql;
+            fromPart = "";
 
-            if (index > 0)
+            var lower = fullSql.ToLower();
+            int idx = lower.IndexOf(" from ");
+            if (idx >= 0)
             {
-                selectPart = fullSql.Substring(0, index);
-                fromPart = fullSql.Substring(index);
+                selectPart = fullSql.Substring(0, idx);
+                fromPart = fullSql.Substring(idx + 1).Trim(); // includes "from ..." (starting at 'from')
             }
-            else
+        }
+
+        // Extrae el nombre de la tabla principal desde la parte que comienza con "from".
+        // Si no puede identificar, devuelve cadena vacía.
+        private string ExtractMainTableFromFromPart(string fromPart)
+        {
+            //if (string.IsNullOrWhiteSpace(fromPart))
+            //    return "";
+
+            var lower = fromPart.ToLower();
+            int idxFrom = lower.IndexOf("from");
+            string tail = (idxFrom >= 0) ? fromPart.Substring(idxFrom + 4).Trim() : fromPart.Trim();
+
+            // cortar antes de WHERE/ORDER/GROUP/HAVING/LIMIT
+            string[] terminators = new[] { " where ", " order ", " group ", " having ", " limit " };
+            int endIdx = -1;
+            foreach (var t in terminators)
             {
-                selectPart = fullSql;
-                fromPart = "";
+                int p = tail.ToLower().IndexOf(t);
+                if (p >= 0)
+                {
+                    if (endIdx < 0 || p < endIdx)
+                    {
+                        endIdx = p;
+                    }
+                }
             }
+
+            if (endIdx >= 0)
+                tail = tail.Substring(0, endIdx).Trim();
+
+            // Si hay joins, la primera palabra suele ser la tabla principal
+            // Tomar la primera token (antes de espacios, comas o alias)
+            var tokens = tail.Split(new[] { ' ', '\t', '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 0)
+                return "";
+
+            // tokens[0] es la tabla principal (puede ser schema.table)
+            return tokens[0];
         }
     }//Form
 }//namespace
