@@ -32,13 +32,19 @@
             this.btnAddRow = new System.Windows.Forms.Button();
             this.btnGenerate = new System.Windows.Forms.Button();
             this.btnValidate = new System.Windows.Forms.Button();
-            this.txtOutput = new System.Windows.Forms.TextBox();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.dgvColumns = new System.Windows.Forms.DataGridView();
             this.panel1 = new System.Windows.Forms.Panel();
             this.btnLoadDat = new System.Windows.Forms.Button();
             this.panel2 = new System.Windows.Forms.Panel();
-            this.txtFromJoins = new System.Windows.Forms.RichTextBox();
+            this.richSelect = new System.Windows.Forms.RichTextBox();
+            this.txtForeignAlias = new System.Windows.Forms.TextBox();
+            this.lblForeignAlias = new System.Windows.Forms.Label();
+            this.txtCountableCol = new System.Windows.Forms.TextBox();
+            this.lblCountable = new System.Windows.Forms.Label();
+            this.txtSqlIdentityKey = new System.Windows.Forms.TextBox();
+            this.lblSqlIdentityKey = new System.Windows.Forms.Label();
+            this.chkProcedure = new System.Windows.Forms.CheckBox();
             this.lblFromJoins = new System.Windows.Forms.Label();
             this.chkEditable = new System.Windows.Forms.CheckBox();
             this.txtForeignSave = new System.Windows.Forms.TextBox();
@@ -53,13 +59,7 @@
             this.lblOrder = new System.Windows.Forms.Label();
             this.lblWhere = new System.Windows.Forms.Label();
             this.txtWhereSql = new System.Windows.Forms.TextBox();
-            this.chkProcedure = new System.Windows.Forms.CheckBox();
-            this.lblSqlIdentityKey = new System.Windows.Forms.Label();
-            this.txtSqlIdentityKey = new System.Windows.Forms.TextBox();
-            this.lblCountable = new System.Windows.Forms.Label();
-            this.txtCountableCol = new System.Windows.Forms.TextBox();
-            this.lblForeignAlias = new System.Windows.Forms.Label();
-            this.txtForeignAlias = new System.Windows.Forms.TextBox();
+            this.richSalida = new System.Windows.Forms.RichTextBox();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvColumns)).BeginInit();
             this.panel1.SuspendLayout();
@@ -96,27 +96,14 @@
             this.btnValidate.UseVisualStyleBackColor = true;
             this.btnValidate.Click += new System.EventHandler(this.btnValidate_Click);
             // 
-            // txtOutput
-            // 
-            this.txtOutput.BackColor = System.Drawing.SystemColors.WindowText;
-            this.txtOutput.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtOutput.Font = new System.Drawing.Font("Cascadia Mono", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtOutput.ForeColor = System.Drawing.Color.Azure;
-            this.txtOutput.Location = new System.Drawing.Point(3, 593);
-            this.txtOutput.Multiline = true;
-            this.txtOutput.Name = "txtOutput";
-            this.txtOutput.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.txtOutput.Size = new System.Drawing.Size(1154, 284);
-            this.txtOutput.TabIndex = 4;
-            // 
             // tableLayoutPanel1
             // 
             this.tableLayoutPanel1.ColumnCount = 1;
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.tableLayoutPanel1.Controls.Add(this.dgvColumns, 0, 1);
-            this.tableLayoutPanel1.Controls.Add(this.txtOutput, 0, 3);
             this.tableLayoutPanel1.Controls.Add(this.panel1, 0, 2);
             this.tableLayoutPanel1.Controls.Add(this.panel2, 0, 0);
+            this.tableLayoutPanel1.Controls.Add(this.richSalida, 0, 3);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
@@ -170,6 +157,7 @@
             // 
             // panel2
             // 
+            this.panel2.Controls.Add(this.richSelect);
             this.panel2.Controls.Add(this.txtForeignAlias);
             this.panel2.Controls.Add(this.lblForeignAlias);
             this.panel2.Controls.Add(this.txtCountableCol);
@@ -177,7 +165,6 @@
             this.panel2.Controls.Add(this.txtSqlIdentityKey);
             this.panel2.Controls.Add(this.lblSqlIdentityKey);
             this.panel2.Controls.Add(this.chkProcedure);
-            this.panel2.Controls.Add(this.txtFromJoins);
             this.panel2.Controls.Add(this.lblFromJoins);
             this.panel2.Controls.Add(this.chkEditable);
             this.panel2.Controls.Add(this.txtForeignSave);
@@ -197,15 +184,71 @@
             this.panel2.Size = new System.Drawing.Size(1003, 144);
             this.panel2.TabIndex = 6;
             // 
-            // txtFromJoins
+            // richSelect
             // 
-            this.txtFromJoins.Font = new System.Drawing.Font("Cascadia Mono", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtFromJoins.Location = new System.Drawing.Point(383, 24);
-            this.txtFromJoins.Name = "txtFromJoins";
-            this.txtFromJoins.Size = new System.Drawing.Size(580, 117);
-            this.txtFromJoins.TabIndex = 16;
-            this.txtFromJoins.Text = "";
-            this.txtFromJoins.TextChanged += new System.EventHandler(this.txtFromJoins_TextChanged);
+            this.richSelect.Location = new System.Drawing.Point(383, 28);
+            this.richSelect.Name = "richSelect";
+            this.richSelect.Size = new System.Drawing.Size(552, 112);
+            this.richSelect.TabIndex = 24;
+            this.richSelect.Text = "";
+            // 
+            // txtForeignAlias
+            // 
+            this.txtForeignAlias.Location = new System.Drawing.Point(272, 75);
+            this.txtForeignAlias.Name = "txtForeignAlias";
+            this.txtForeignAlias.Size = new System.Drawing.Size(100, 20);
+            this.txtForeignAlias.TabIndex = 23;
+            // 
+            // lblForeignAlias
+            // 
+            this.lblForeignAlias.AutoSize = true;
+            this.lblForeignAlias.Location = new System.Drawing.Point(202, 78);
+            this.lblForeignAlias.Name = "lblForeignAlias";
+            this.lblForeignAlias.Size = new System.Drawing.Size(64, 13);
+            this.lblForeignAlias.TabIndex = 22;
+            this.lblForeignAlias.Text = "ForeignAlias";
+            // 
+            // txtCountableCol
+            // 
+            this.txtCountableCol.Location = new System.Drawing.Point(86, 98);
+            this.txtCountableCol.Name = "txtCountableCol";
+            this.txtCountableCol.Size = new System.Drawing.Size(100, 20);
+            this.txtCountableCol.TabIndex = 21;
+            // 
+            // lblCountable
+            // 
+            this.lblCountable.AutoSize = true;
+            this.lblCountable.Location = new System.Drawing.Point(14, 101);
+            this.lblCountable.Name = "lblCountable";
+            this.lblCountable.Size = new System.Drawing.Size(73, 13);
+            this.lblCountable.TabIndex = 20;
+            this.lblCountable.Text = "Countable Col";
+            // 
+            // txtSqlIdentityKey
+            // 
+            this.txtSqlIdentityKey.Location = new System.Drawing.Point(86, 75);
+            this.txtSqlIdentityKey.Name = "txtSqlIdentityKey";
+            this.txtSqlIdentityKey.Size = new System.Drawing.Size(100, 20);
+            this.txtSqlIdentityKey.TabIndex = 19;
+            // 
+            // lblSqlIdentityKey
+            // 
+            this.lblSqlIdentityKey.AutoSize = true;
+            this.lblSqlIdentityKey.Location = new System.Drawing.Point(13, 78);
+            this.lblSqlIdentityKey.Name = "lblSqlIdentityKey";
+            this.lblSqlIdentityKey.Size = new System.Drawing.Size(74, 13);
+            this.lblSqlIdentityKey.TabIndex = 18;
+            this.lblSqlIdentityKey.Text = "SqlIdentityKey";
+            // 
+            // chkProcedure
+            // 
+            this.chkProcedure.AutoSize = true;
+            this.chkProcedure.Location = new System.Drawing.Point(272, 100);
+            this.chkProcedure.Name = "chkProcedure";
+            this.chkProcedure.Size = new System.Drawing.Size(75, 17);
+            this.chkProcedure.TabIndex = 17;
+            this.chkProcedure.Text = "Procedure";
+            this.chkProcedure.UseVisualStyleBackColor = true;
             // 
             // lblFromJoins
             // 
@@ -322,63 +365,15 @@
             this.txtWhereSql.Size = new System.Drawing.Size(288, 20);
             this.txtWhereSql.TabIndex = 0;
             // 
-            // chkProcedure
+            // richSalida
             // 
-            this.chkProcedure.AutoSize = true;
-            this.chkProcedure.Location = new System.Drawing.Point(272, 100);
-            this.chkProcedure.Name = "chkProcedure";
-            this.chkProcedure.Size = new System.Drawing.Size(75, 17);
-            this.chkProcedure.TabIndex = 17;
-            this.chkProcedure.Text = "Procedure";
-            this.chkProcedure.UseVisualStyleBackColor = true;
-            // 
-            // lblSqlIdentityKey
-            // 
-            this.lblSqlIdentityKey.AutoSize = true;
-            this.lblSqlIdentityKey.Location = new System.Drawing.Point(13, 78);
-            this.lblSqlIdentityKey.Name = "lblSqlIdentityKey";
-            this.lblSqlIdentityKey.Size = new System.Drawing.Size(74, 13);
-            this.lblSqlIdentityKey.TabIndex = 18;
-            this.lblSqlIdentityKey.Text = "SqlIdentityKey";
-            // 
-            // txtSqlIdentityKey
-            // 
-            this.txtSqlIdentityKey.Location = new System.Drawing.Point(86, 75);
-            this.txtSqlIdentityKey.Name = "txtSqlIdentityKey";
-            this.txtSqlIdentityKey.Size = new System.Drawing.Size(100, 20);
-            this.txtSqlIdentityKey.TabIndex = 19;
-            // 
-            // lblCountable
-            // 
-            this.lblCountable.AutoSize = true;
-            this.lblCountable.Location = new System.Drawing.Point(14, 101);
-            this.lblCountable.Name = "lblCountable";
-            this.lblCountable.Size = new System.Drawing.Size(73, 13);
-            this.lblCountable.TabIndex = 20;
-            this.lblCountable.Text = "Countable Col";
-            // 
-            // txtCountableCol
-            // 
-            this.txtCountableCol.Location = new System.Drawing.Point(86, 98);
-            this.txtCountableCol.Name = "txtCountableCol";
-            this.txtCountableCol.Size = new System.Drawing.Size(100, 20);
-            this.txtCountableCol.TabIndex = 21;
-            // 
-            // lblForeignAlias
-            // 
-            this.lblForeignAlias.AutoSize = true;
-            this.lblForeignAlias.Location = new System.Drawing.Point(202, 78);
-            this.lblForeignAlias.Name = "lblForeignAlias";
-            this.lblForeignAlias.Size = new System.Drawing.Size(64, 13);
-            this.lblForeignAlias.TabIndex = 22;
-            this.lblForeignAlias.Text = "ForeignAlias";
-            // 
-            // txtForeignAlias
-            // 
-            this.txtForeignAlias.Location = new System.Drawing.Point(272, 75);
-            this.txtForeignAlias.Name = "txtForeignAlias";
-            this.txtForeignAlias.Size = new System.Drawing.Size(100, 20);
-            this.txtForeignAlias.TabIndex = 23;
+            this.richSalida.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.richSalida.Font = new System.Drawing.Font("Cascadia Mono", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.richSalida.Location = new System.Drawing.Point(3, 593);
+            this.richSalida.Name = "richSalida";
+            this.richSalida.Size = new System.Drawing.Size(1154, 284);
+            this.richSalida.TabIndex = 7;
+            this.richSalida.Text = "";
             // 
             // Form1
             // 
@@ -389,7 +384,6 @@
             this.Name = "Form1";
             this.Text = "Form1";
             this.tableLayoutPanel1.ResumeLayout(false);
-            this.tableLayoutPanel1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvColumns)).EndInit();
             this.panel1.ResumeLayout(false);
             this.panel2.ResumeLayout(false);
@@ -402,7 +396,6 @@
         private System.Windows.Forms.Button btnAddRow;
         private System.Windows.Forms.Button btnGenerate;
         private System.Windows.Forms.Button btnValidate;
-        private System.Windows.Forms.TextBox txtOutput;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
         private System.Windows.Forms.DataGridView dgvColumns;
         private System.Windows.Forms.Panel panel1;
@@ -422,7 +415,6 @@
         private System.Windows.Forms.TextBox txtForeignSave;
         private System.Windows.Forms.Label lblForeignSave;
         private System.Windows.Forms.Label lblFromJoins;
-        private System.Windows.Forms.RichTextBox txtFromJoins;
         private System.Windows.Forms.Label lblSqlIdentityKey;
         private System.Windows.Forms.CheckBox chkProcedure;
         private System.Windows.Forms.TextBox txtCountableCol;
@@ -430,6 +422,8 @@
         private System.Windows.Forms.TextBox txtSqlIdentityKey;
         private System.Windows.Forms.TextBox txtForeignAlias;
         private System.Windows.Forms.Label lblForeignAlias;
+        private System.Windows.Forms.RichTextBox richSelect;
+        private System.Windows.Forms.RichTextBox richSalida;
     }
 }
 

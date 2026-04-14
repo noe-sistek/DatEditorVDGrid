@@ -21,6 +21,15 @@ namespace DatEditorVDGrid
         private string _fullEllipsisColsToAsign = "";
         private string _fullEllipsisColsToAlias = "";
 
+        // Syntax/coloring settings for SQL keywords and output separators
+        private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
+        private readonly Color _joinColor = Color.Blue;
+        private readonly Color _keywordColor = Color.Green;
+        private readonly Color _separatorColor = Color.Orange;
+
+        // guard to avoid recursive TextChanged events when we update RichTextBox.Text programmatically
+        private bool _suppressRichSelectTextChanged = false;
+
         public Form1()
         {
             InitializeComponent();
@@ -212,7 +221,8 @@ namespace DatEditorVDGrid
 
             // construir SELECT respetando que los campos no contengan coma adicional
             string selectClause = "SELECT " + string.Join(",", selectParts);
-            string fromJoins = txtFromJoins.Text?.Trim() ?? "";
+            // use richSelect (independent) for FROM/JOIN content
+            string fromJoins = richSelect.Text?.Trim() ?? "";
             string fullSql = string.IsNullOrWhiteSpace(fromJoins) ? selectClause : (selectClause + " " + fromJoins);
 
             var sb = new StringBuilder();
@@ -363,7 +373,11 @@ namespace DatEditorVDGrid
                 AppendWrappedProperty(sb, "EllipsisColsToAlias", _fullEllipsisColsToAlias ?? "");
             }
 
-            txtOutput.Text = sb.ToString();
+            // show generated .dat inside richSalida only
+            richSalida.Text = sb.ToString();
+
+            // Only color separator characters (commas and tildes). Do not change background/overall forecolor here.
+            HighlightSeparators(richSalida, new[] { ',', '~' }, _separatorColor);
         }
 
         private void btnValidate_Click(object sender, EventArgs e)
@@ -479,8 +493,18 @@ namespace DatEditorVDGrid
             if (data.ContainsKey("EllipsisColsToAlias"))
                 _fullEllipsisColsToAlias = GetFullProperty(data, "EllipsisColsToAlias");
 
-            // From+Joins se muestra en txtFromJoins (control para editar o mantener)
-            txtFromJoins.Text = fromPart?.Trim() ?? "";
+            // From+Joins se muestra en richSelect (control independiente)
+            try
+            {
+                _suppressRichSelectTextChanged = true;
+                richSelect.Text = fromPart?.Trim() ?? "";
+                // ensure reserved words appear uppercased + colored from the start
+                ApplySqlKeywordHighlight(richSelect, uppercaseKeywords: true);
+            }
+            finally
+            {
+                _suppressRichSelectTextChanged = false;
+            }
 
             // reconstruir lista de campos del SELECT sin el prefijo SELECT
             var sourceBody = selectOnly ?? fullSource;
@@ -536,11 +560,6 @@ namespace DatEditorVDGrid
                 var csvTokens = _globalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
                 // We'll still clear ellipsisColsToShowTokens so the per-row ~-joined value will be taken from cells
                 ellipsisColsToShowTokens = new string[0];
-
-                // Store CSV tokens temporarily in a list to assign after we create rows
-                // We'll reuse 'ellipsisColsToShowTokensAssign' below by reading csvTokens while filling rows.
-                // Save csvTokens to a local variable in outer scope via a closure - instead store in field? simpler: keep local here and assign via index when filling rows.
-                // To pass csvTokens to assignment loop, we set a temp variable in this scope and use it below.
             }
 
             // Load EllipsisColsToAsign / EllipsisColsToAlias tokens (full strings preserved already)
@@ -889,56 +908,125 @@ namespace DatEditorVDGrid
             return candidate;
         }
 
-        private void txtFromJoins_TextChanged(object sender, EventArgs e)
+        // New: handle changes in richSelect (uppercase reserved words and color them when a word completes)
+        private void richSelect_TextChanged(object sender, EventArgs e)
         {
-            // Solo procesar si el último carácter es un espacio o si se borró texto
-            if (txtFromJoins.Text.Length > 0 &&
-                txtFromJoins.Text[txtFromJoins.Text.Length - 1] != ' ' && !txtFromJoins.Text.EndsWith("\n"))
+            if (_suppressRichSelectTextChanged)
+                return;
+
+            // Only process when last character is space/newline or when text shortened
+            if (richSelect.Text.Length > 0 &&
+                richSelect.Text[richSelect.Text.Length - 1] != ' ' && !richSelect.Text.EndsWith("\n"))
             {
                 return;
             }
 
-            // Keywords SQL para FROM/JOINs
-            string[] keywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
-            Color joinColor = Color.Blue;
-            Color keywordColor = Color.Green;
+            ApplySqlKeywordHighlight(richSelect, uppercaseKeywords: true);
+        }
 
-            // Guardar posición/selección actual
-            int selStart = txtFromJoins.SelectionStart;
-            int selLength = txtFromJoins.SelectionLength;
+        // Apply uppercase (optional) and color highlighting for SQL keywords inside a RichTextBox.
+        // Preserves caret/selection.
+        private void ApplySqlKeywordHighlight(RichTextBox rtb, bool uppercaseKeywords)
+        {
+            if (rtb == null) return;
 
-            // Resetear colores a negro
-            txtFromJoins.SelectAll();
-            txtFromJoins.SelectionColor = Color.Black;
+            int origSelStart = rtb.SelectionStart;
+            int origSelLen = rtb.SelectionLength;
 
-            string text = txtFromJoins.Text ?? "";
+            string originalText = rtb.Text ?? "";
+            string processedText = originalText;
 
-            foreach (string kw in keywords)
+            if (uppercaseKeywords)
             {
-                string pattern = $@"\b{Regex.Escape(kw)}\b";
-                foreach (Match m in Regex.Matches(text, pattern, RegexOptions.IgnoreCase))
+                // Replace occurrences of keywords with their uppercase form (length unchanged)
+                foreach (var kw in _sqlKeywords)
                 {
-                    txtFromJoins.Select(m.Index, m.Length);
-                    if (string.Equals(kw, "ON", System.StringComparison.OrdinalIgnoreCase) || string.Equals(kw, "AS", System.StringComparison.OrdinalIgnoreCase))
-                        txtFromJoins.SelectionColor = keywordColor;
-                    else
-                        txtFromJoins.SelectionColor = joinColor;
+                    processedText = Regex.Replace(processedText, $@"\b{Regex.Escape(kw)}\b", kw, RegexOptions.IgnoreCase);
                 }
             }
 
-            // Restaurar cursor/selección
-            if (selStart >= 0 && selStart <= txtFromJoins.Text.Length)
+            // Only assign Text if changed to avoid recursive TextChanged churn
+            bool textChanged = !string.Equals(originalText, processedText, System.StringComparison.Ordinal);
+            if (textChanged)
             {
-                txtFromJoins.SelectionStart = selStart;
-                txtFromJoins.SelectionLength = selLength;
+                _suppressRichSelectTextChanged = true;
+                try
+                {
+                    rtb.Text = processedText;
+                }
+                finally
+                {
+                    _suppressRichSelectTextChanged = false;
+                }
+            }
+
+            // Do not force a specific global text color; use control ForeColor for non-keywords
+            Color normalColor = rtb.ForeColor;
+
+            string textToScan = rtb.Text ?? "";
+
+            // Color each keyword occurrence; leave other text colors as-is (we set keyword color directly)
+            foreach (var kw in _sqlKeywords)
+            {
+                string pattern = $@"\b{Regex.Escape(kw)}\b";
+                foreach (Match m in Regex.Matches(textToScan, pattern, RegexOptions.IgnoreCase))
+                {
+                    rtb.Select(m.Index, m.Length);
+                    if (string.Equals(kw, "ON", System.StringComparison.OrdinalIgnoreCase) || string.Equals(kw, "AS", System.StringComparison.OrdinalIgnoreCase))
+                        rtb.SelectionColor = _keywordColor;
+                    else
+                        rtb.SelectionColor = _joinColor;
+                }
+            }
+
+            // Restore original selection and selection color
+            if (origSelStart >= 0 && origSelStart <= rtb.Text.Length)
+            {
+                rtb.SelectionStart = origSelStart;
+                rtb.SelectionLength = origSelLen;
             }
             else
             {
-                txtFromJoins.SelectionStart = txtFromJoins.Text.Length;
-                txtFromJoins.SelectionLength = 0;
+                rtb.SelectionStart = rtb.Text.Length;
+                rtb.SelectionLength = 0;
             }
-            txtFromJoins.SelectionColor = Color.Black;
-            txtFromJoins.DeselectAll();
+            rtb.SelectionColor = normalColor;
+            rtb.DeselectAll();
+        }
+
+        // Highlight separators (commas and tildes) inside generated .dat shown in richSalida.
+        // IMPORTANT: do not change background/overall forecolor of the RichTextBox here.
+        // Only color separator characters so the user can choose overall colors in designer/properties.
+        private void HighlightSeparators(RichTextBox rtb, char[] separators, Color sepColor)
+        {
+            if (rtb == null) return;
+
+            int origSelStart = rtb.SelectionStart;
+            int origSelLen = rtb.SelectionLength;
+
+            string text = rtb.Text ?? "";
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (separators.Contains(text[i]))
+                {
+                    rtb.Select(i, 1);
+                    rtb.SelectionColor = sepColor;
+                }
+            }
+
+            // Restore selection and selection color to match current ForeColor
+            if (origSelStart >= 0 && origSelStart <= rtb.Text.Length)
+            {
+                rtb.SelectionStart = origSelStart;
+                rtb.SelectionLength = origSelLen;
+            }
+            else
+            {
+                rtb.SelectionStart = rtb.Text.Length;
+                rtb.SelectionLength = 0;
+            }
+            rtb.SelectionColor = rtb.ForeColor;
+            rtb.DeselectAll();
         }
 
         // Commit checkbox edits immediately so CellValueChanged fires.
