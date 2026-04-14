@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.btnAddRow = new System.Windows.Forms.Button();
             this.btnGenerate = new System.Windows.Forms.Button();
             this.btnValidate = new System.Windows.Forms.Button();
@@ -131,6 +132,14 @@
             // 
             this.dgvColumns.AllowUserToOrderColumns = true;
             this.dgvColumns.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle1.Font = new System.Drawing.Font("Cascadia Mono", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.dgvColumns.DefaultCellStyle = dataGridViewCellStyle1;
             this.dgvColumns.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dgvColumns.Location = new System.Drawing.Point(3, 153);
             this.dgvColumns.Name = "dgvColumns";
@@ -193,7 +202,7 @@
             this.txtFromJoins.Font = new System.Drawing.Font("Cascadia Mono", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.txtFromJoins.Location = new System.Drawing.Point(383, 24);
             this.txtFromJoins.Name = "txtFromJoins";
-            this.txtFromJoins.Size = new System.Drawing.Size(525, 117);
+            this.txtFromJoins.Size = new System.Drawing.Size(580, 117);
             this.txtFromJoins.TabIndex = 16;
             this.txtFromJoins.Text = "";
             this.txtFromJoins.TextChanged += new System.EventHandler(this.txtFromJoins_TextChanged);

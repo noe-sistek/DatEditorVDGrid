@@ -16,6 +16,11 @@ namespace DatEditorVDGrid
         // Holds a global EllipsisColsToShowfrmSearch value when the .dat provides a single long CSV
         private string _globalEllipsisColsToShow = "";
 
+        // preserve full loaded values for EllipsisColsToAsign / EllipsisColsToAlias so we can
+        // write them back unchanged (split into numbered lines respecting 255 chars).
+        private string _fullEllipsisColsToAsign = "";
+        private string _fullEllipsisColsToAlias = "";
+
         public Form1()
         {
             InitializeComponent();
@@ -28,6 +33,7 @@ namespace DatEditorVDGrid
 
             dgvColumns.AllowUserToAddRows = false;
 
+            // Core column order
             dgvColumns.Columns.Add("Pos", "Pos");
             dgvColumns.Columns.Add("CampoSQL", "Campo SQL");
             dgvColumns.Columns.Add("Alias", "Alias");
@@ -53,42 +59,64 @@ namespace DatEditorVDGrid
             dgvColumns.Columns.Add("Header", "Header");
             dgvColumns.Columns.Add("Width", "Width");
 
-            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
-            {
-                Name = "Editable",
-                HeaderText = "Editable"
-            });
             dgvColumns.Columns.Add("Format", "Formato");
 
-            // NEW: EllipsisColsWidths, EllipsisColsHeaders, EllipsisColsToShowfrmSearch (text per row)
+            // Ellipsis-related columns: ORDERED to match [Ellipsiscols] properties order
+            // 1) Which ones -> checkbox per-row
             dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
             {
                 Name = "Ellipsis",
                 HeaderText = "Ellipsis"
             });
+
+            // 2) EllipsisSqlSources (per-row sources token)
+            dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
+            {
+                Name = "EllipsisSqlSources",
+                HeaderText = "EllipsisSqlSources"
+            });
+
+            // 3) EllipsisColsWidths
             dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
             {
                 Name = "EllipsisColsWidths",
                 HeaderText = "EllipsisColsWidths"
             });
+
+            // 4) EllipsisColsHeaders
             dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
             {
                 Name = "EllipsisColsHeaders",
                 HeaderText = "EllipsisColsHeaders"
             });
+
+            // 5) EllipsisColsToShowfrmSearch (per-row token; may be loaded from a global CSV too)
             dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
             {
                 Name = "EllipsisColsToShowfrmSearch",
                 HeaderText = "EllipsisColsToShowfrmSearch"
             });
 
-            // EllipsisSqlSources per-row text column
-            var ellipsisSourceCol = new DataGridViewTextBoxColumn()
+            // 6) EllipsisColsToAsign (new) - per-row token
+            dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
             {
-                Name = "EllipsisSqlSources",
-                HeaderText = "EllipsisSqlSources"
-            };
-            dgvColumns.Columns.Add(ellipsisSourceCol);
+                Name = "EllipsisColsToAsign",
+                HeaderText = "EllipsisColsToAsign"
+            });
+
+            // 7) EllipsisColsToAlias (new) - per-row token
+            dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
+            {
+                Name = "EllipsisColsToAlias",
+                HeaderText = "EllipsisColsToAlias"
+            });
+
+            // editable last in row set
+            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
+            {
+                Name = "Editable",
+                HeaderText = "Editable"
+            });
 
             // Ensure edits commit immediately for checkbox handling
             dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
@@ -96,9 +124,7 @@ namespace DatEditorVDGrid
         }
 
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
-        {
-
-        }
+        { }
 
         private void btnAddRow_Click(object sender, EventArgs e)
         {
@@ -124,11 +150,15 @@ namespace DatEditorVDGrid
             var headers = new List<string>();
             var widths = new List<string>();
             var formats = new List<string>();
-            var ellipsisList = new List<string>();
+
+            // Build ellipsis per-row collections from the grid; if none present, we'll fallback to _full...
+            var ellipsisWhichOnes = new List<string>();
             var ellipsisSqlSources = new List<string>();
             var ellipsisColsWidths = new List<string>();
             var ellipsisColsHeaders = new List<string>();
             var ellipsisColsToShow = new List<string>();
+            var ellipsisColsToAsign = new List<string>();
+            var ellipsisColsToAlias = new List<string>();
 
             foreach (var row in filas)
             {
@@ -145,15 +175,15 @@ namespace DatEditorVDGrid
                 string format = row.Cells["Format"].Value?.ToString() ?? "0";
                 bool ellipsis = Convert.ToBoolean(row.Cells["Ellipsis"].Value ?? false);
 
-                // EllipsisSqlSources per-row text cell (could be empty)
+                // per-row ellipsis cells (may be empty)
                 string ellSrc = row.Cells["EllipsisSqlSources"].Value?.ToString() ?? "";
-
-                // Additional per-row ellipsis properties
                 string eWidth = row.Cells["EllipsisColsWidths"].Value?.ToString() ?? "";
                 string eHeader = row.Cells["EllipsisColsHeaders"].Value?.ToString() ?? "";
                 string eShow = row.Cells["EllipsisColsToShowfrmSearch"].Value?.ToString() ?? "";
+                string eAsign = row.Cells["EllipsisColsToAsign"].Value?.ToString() ?? "";
+                string eAlias = row.Cells["EllipsisColsToAlias"].Value?.ToString() ?? "";
 
-                // si alias está vacío, no añadir espacio extra
+                // select parts
                 selectParts.Add(string.IsNullOrWhiteSpace(alias) ? $"{campo}" : $"{campo} {alias}");
                 dataTypes.Add(tipo);
                 fieldsToSave.Add(guardar ? "1" : "0");
@@ -161,18 +191,24 @@ namespace DatEditorVDGrid
                 headers.Add(header);
                 widths.Add(width);
                 formats.Add(format);
-                ellipsisList.Add(ellipsis ? "1" : "0");
+
+                // collect ellipsis tokens per row
+                ellipsisWhichOnes.Add(ellipsis ? "1" : "0");
                 ellipsisSqlSources.Add(ellSrc);
                 ellipsisColsWidths.Add(eWidth);
                 ellipsisColsHeaders.Add(eHeader);
                 ellipsisColsToShow.Add(eShow);
+                ellipsisColsToAsign.Add(eAsign);
+                ellipsisColsToAlias.Add(eAlias);
             }
 
-            // Trim trailing empty tokens to avoid generating many trailing '~'
+            // Trim trailing empty tokens for per-row lists (only for things using ~ separators)
             TrimTrailingEmpty(ellipsisSqlSources);
             TrimTrailingEmpty(ellipsisColsWidths);
             TrimTrailingEmpty(ellipsisColsHeaders);
             TrimTrailingEmpty(ellipsisColsToShow);
+            TrimTrailingEmpty(ellipsisColsToAsign);
+            TrimTrailingEmpty(ellipsisColsToAlias);
 
             // construir SELECT respetando que los campos no contengan coma adicional
             string selectClause = "SELECT " + string.Join(",", selectParts);
@@ -190,11 +226,6 @@ namespace DatEditorVDGrid
             // Procedimiento fijo
             sb.AppendLine("Procedure=0");
 
-            // --- Now produce the keys in the exact order required by your example ---
-            // WhereSql, OrderSql, TabletoSave (note: using the exact key name from your example),
-            // DataTypes, FieldsToSave, SqlIdentityKey, CountableCol, KeyField,
-            // ForeignKey, ForeignToSave, ForeignAlias, RequiredFields
-
             // Where & Order
             AppendWrappedProperty(sb, "WhereSql", txtWhereSql.Text);
             AppendWrappedProperty(sb, "OrderSql", txtOrderSql.Text);
@@ -206,23 +237,17 @@ namespace DatEditorVDGrid
             AppendWrappedProperty(sb, "DataTypes", string.Join(",", dataTypes));
             AppendWrappedProperty(sb, "FieldsToSave", string.Join(",", fieldsToSave));
 
-            // SqlIdentityKey: take from the dedicated textbox
-            string sqlIdentity = txtSqlIdentityKey.Text?.Trim() ?? "";
-            AppendWrappedProperty(sb, "SqlIdentityKey", sqlIdentity);
-
-            // CountableCol: use txtCountableCol
+            // SqlIdentityKey, CountableCol, KeyField
+            AppendWrappedProperty(sb, "SqlIdentityKey", txtSqlIdentityKey.Text?.Trim() ?? "");
             AppendWrappedProperty(sb, "CountableCol", txtCountableCol.Text?.Trim() ?? "");
-
-            // KeyField
             AppendWrappedProperty(sb, "KeyField", txtKeyField.Text);
 
-            // ForeignKey / ForeignToSave
+            // ForeignKey / ForeignToSave / ForeignAlias
             string foreignKeyStr = txtForeignKey.Text?.Trim() ?? "";
             string foreignToSaveStr = txtForeignSave.Text?.Trim() ?? "";
             AppendWrappedProperty(sb, "ForeignKey", foreignKeyStr);
             AppendWrappedProperty(sb, "ForeignToSave", foreignToSaveStr);
 
-            // ForeignAlias: prefer explicit textbox; otherwise infer main alias or emit placeholders
             string foreignAliasStr = txtForeignAlias.Text?.Trim() ?? "";
             if (string.IsNullOrEmpty(foreignAliasStr) && !string.IsNullOrEmpty(foreignKeyStr))
             {
@@ -281,28 +306,62 @@ namespace DatEditorVDGrid
             sb.AppendLine();
             sb.AppendLine("[Ellipsiscols]");
 
-            // EllipsisWhichOnes: keep comma-separated list
-            AppendWrappedProperty(sb, "EllipsisWhichOnes", string.Join(",", ellipsisList));
+            // EllipsisWhichOnes: keep comma-separated list (from per-row data)
+            if (ellipsisWhichOnes.Count > 0)
+                AppendWrappedProperty(sb, "EllipsisWhichOnes", string.Join(",", ellipsisWhichOnes));
+            else
+                AppendWrappedProperty(sb, "EllipsisWhichOnes", "");
 
-            // EllipsisSqlSources: joined by ~ (one token per row)
-            AppendWrappedProperty(sb, "EllipsisSqlSources", string.Join("~", ellipsisSqlSources));
+            // EllipsisSqlSources: joined by ~ (one token per row) -- prefer per-row tokens
+            if (ellipsisSqlSources.Count > 0)
+                AppendWrappedProperty(sb, "EllipsisSqlSources", string.Join("~", ellipsisSqlSources));
+            else
+                AppendWrappedProperty(sb, "EllipsisSqlSources", "");
 
             // Ellipsis cols properties: joined by ~ (top-level separator)
-            AppendWrappedProperty(sb, "EllipsisColsWidths", string.Join("~", ellipsisColsWidths));
-            AppendWrappedProperty(sb, "EllipsisColsHeaders", string.Join("~", ellipsisColsHeaders));
+            if (ellipsisColsWidths.Count > 0)
+                AppendWrappedProperty(sb, "EllipsisColsWidths", string.Join("~", ellipsisColsWidths));
+            else
+                AppendWrappedProperty(sb, "EllipsisColsWidths", "");
+
+            if (ellipsisColsHeaders.Count > 0)
+                AppendWrappedProperty(sb, "EllipsisColsHeaders", string.Join("~", ellipsisColsHeaders));
+            else
+                AppendWrappedProperty(sb, "EllipsisColsHeaders", "");
 
             // EllipsisColsToShowfrmSearch: prefer per-row tokens if any; otherwise use global value from .dat (if present)
-            string ellipsisColsToShowValue = "";
             if (ellipsisColsToShow.Any(s => !string.IsNullOrWhiteSpace(s)))
             {
-                ellipsisColsToShowValue = string.Join("~", ellipsisColsToShow);
+                AppendWrappedProperty(sb, "EllipsisColsToShowfrmSearch", string.Join("~", ellipsisColsToShow));
             }
             else if (!string.IsNullOrWhiteSpace(_globalEllipsisColsToShow))
             {
-                // use the original global CSV (no ~)
-                ellipsisColsToShowValue = _globalEllipsisColsToShow;
+                AppendWrappedProperty(sb, "EllipsisColsToShowfrmSearch", _globalEllipsisColsToShow);
             }
-            AppendWrappedProperty(sb, "EllipsisColsToShowfrmSearch", ellipsisColsToShowValue);
+            else
+            {
+                AppendWrappedProperty(sb, "EllipsisColsToShowfrmSearch", "");
+            }
+
+            // EllipsisColsToAsign: prefer per-row tokens; fallback to originally loaded full value
+            if (ellipsisColsToAsign.Any(s => !string.IsNullOrWhiteSpace(s)))
+            {
+                AppendWrappedProperty(sb, "EllipsisColsToAsign", string.Join("~", ellipsisColsToAsign));
+            }
+            else
+            {
+                AppendWrappedProperty(sb, "EllipsisColsToAsign", _fullEllipsisColsToAsign ?? "");
+            }
+
+            // EllipsisColsToAlias: prefer per-row tokens; fallback to originally loaded full value
+            if (ellipsisColsToAlias.Any(s => !string.IsNullOrWhiteSpace(s)))
+            {
+                AppendWrappedProperty(sb, "EllipsisColsToAlias", string.Join("~", ellipsisColsToAlias));
+            }
+            else
+            {
+                AppendWrappedProperty(sb, "EllipsisColsToAlias", _fullEllipsisColsToAlias ?? "");
+            }
 
             txtOutput.Text = sb.ToString();
         }
@@ -319,13 +378,9 @@ namespace DatEditorVDGrid
             foreach (var row in filas)
             {
                 string campo = row.Cells["CampoSQL"].Value?.ToString();
-                // alias validation removed per request
-                bool guardar = Convert.ToBoolean(row.Cells["Guardar"].Value ?? false);
-
                 if (string.IsNullOrWhiteSpace(campo))
                     errores.Add("CampoSQL vacío");
             }
-
 
             if (errores.Count == 0)
                 MessageBox.Show("Todo OK", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -381,6 +436,8 @@ namespace DatEditorVDGrid
 
             // reset global ellipsis-per-popup holder
             _globalEllipsisColsToShow = "";
+            _fullEllipsisColsToAsign = "";
+            _fullEllipsisColsToAlias = "";
 
             var fullSource = GetFullProperty(data, "SourceSql");
 
@@ -415,6 +472,12 @@ namespace DatEditorVDGrid
             txtCountableCol.Text = data.ContainsKey("CountableCol") ? GetFullProperty(data, "CountableCol") : "";
             txtForeignAlias.Text = data.ContainsKey("ForeignAlias") ? GetFullProperty(data, "ForeignAlias") : "";
             chkEditable.Checked = data.ContainsKey("Editable") && GetFullProperty(data, "Editable").Trim() == "1";
+
+            // NEW: load EllipsisColsToAsign / EllipsisColsToAlias full values for later re-output
+            if (data.ContainsKey("EllipsisColsToAsign"))
+                _fullEllipsisColsToAsign = GetFullProperty(data, "EllipsisColsToAsign");
+            if (data.ContainsKey("EllipsisColsToAlias"))
+                _fullEllipsisColsToAlias = GetFullProperty(data, "EllipsisColsToAlias");
 
             // From+Joins se muestra en txtFromJoins (control para editar o mantener)
             txtFromJoins.Text = fromPart?.Trim() ?? "";
@@ -465,12 +528,42 @@ namespace DatEditorVDGrid
                 : fullEllipsisColsToShow.Split(new[] { '~' }, StringSplitOptions.None);
 
             // If there's only one token and it contains commas, treat it as the global CSV for the popup
+            // -> ALSO populate per-row column so values are visible/editable in the grid.
             if (ellipsisColsToShowTokens.Length == 1 && ellipsisColsToShowTokens[0].Contains(","))
             {
                 _globalEllipsisColsToShow = ellipsisColsToShowTokens[0];
-                // clear per-row tokens so we don't assign that big CSV into the first row
+                // try to split by commas and assign each token to the corresponding row's cell
+                var csvTokens = _globalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
+                // We'll still clear ellipsisColsToShowTokens so the per-row ~-joined value will be taken from cells
                 ellipsisColsToShowTokens = new string[0];
+
+                // Store CSV tokens temporarily in a list to assign after we create rows
+                // We'll reuse 'ellipsisColsToShowTokensAssign' below by reading csvTokens while filling rows.
+                // Save csvTokens to a local variable in outer scope via a closure - instead store in field? simpler: keep local here and assign via index when filling rows.
+                // To pass csvTokens to assignment loop, we set a temp variable in this scope and use it below.
             }
+
+            // Load EllipsisColsToAsign / EllipsisColsToAlias tokens (full strings preserved already)
+            var fullEllipsisColsToAsign = data.ContainsKey("EllipsisColsToAsign") ? GetFullProperty(data, "EllipsisColsToAsign") : "";
+            var ellipsisColsToAsignTokens = string.IsNullOrEmpty(fullEllipsisColsToAsign)
+                ? new string[0]
+                : fullEllipsisColsToAsign.Split(new[] { '~' }, StringSplitOptions.None);
+
+            var fullEllipsisColsToAlias = data.ContainsKey("EllipsisColsToAlias") ? GetFullProperty(data, "EllipsisColsToAlias") : "";
+            var ellipsisColsToAliasTokens = string.IsNullOrEmpty(fullEllipsisColsToAlias)
+                ? new string[0]
+                : fullEllipsisColsToAlias.Split(new[] { '~' }, StringSplitOptions.None);
+
+            // preserve full original strings for fallback
+            if (!string.IsNullOrEmpty(fullEllipsisColsToAsign))
+                _fullEllipsisColsToAsign = fullEllipsisColsToAsign;
+            if (!string.IsNullOrEmpty(fullEllipsisColsToAlias))
+                _fullEllipsisColsToAlias = fullEllipsisColsToAlias;
+
+            // If we had a single global CSV for EllipsisColsToShowfrmSearch, create csvTokens now so we can assign per-row
+            string[] ellipsisColsToShowGlobalCsvTokens = null;
+            if (!string.IsNullOrEmpty(_globalEllipsisColsToShow))
+                ellipsisColsToShowGlobalCsvTokens = _globalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
 
             for (int i = 0; i < campos.Count; i++)
             {
@@ -514,21 +607,51 @@ namespace DatEditorVDGrid
                 else
                     dgvColumns.Rows[rowIndex].Cells["EllipsisSqlSources"].Value = "";
 
-                // Assign new ellipsis columns per-row tokens (top-level separator is ~)
+                // Assign EllipsisColsWidths token if present
                 if (i < ellipsisColsWidthsTokens.Length)
                     dgvColumns.Rows[rowIndex].Cells["EllipsisColsWidths"].Value = ellipsisColsWidthsTokens[i];
                 else
                     dgvColumns.Rows[rowIndex].Cells["EllipsisColsWidths"].Value = "";
 
+                // Assign EllipsisColsHeaders token if present
                 if (i < ellipsisColsHeadersTokens.Length)
                     dgvColumns.Rows[rowIndex].Cells["EllipsisColsHeaders"].Value = ellipsisColsHeadersTokens[i];
                 else
                     dgvColumns.Rows[rowIndex].Cells["EllipsisColsHeaders"].Value = "";
 
-                if (i < ellipsisColsToShowTokens.Length)
-                    dgvColumns.Rows[rowIndex].Cells["EllipsisColsToShowfrmSearch"].Value = ellipsisColsToShowTokens[i];
+                // Assign EllipsisColsToShowfrmSearch:
+                if (ellipsisColsToShowTokens.Length > 0)
+                {
+                    // there were per-row ~ tokens in the .dat; assign
+                    if (i < ellipsisColsToShowTokens.Length)
+                        dgvColumns.Rows[rowIndex].Cells["EllipsisColsToShowfrmSearch"].Value = ellipsisColsToShowTokens[i];
+                    else
+                        dgvColumns.Rows[rowIndex].Cells["EllipsisColsToShowfrmSearch"].Value = "";
+                }
+                else if (ellipsisColsToShowGlobalCsvTokens != null)
+                {
+                    // distribute global CSV tokens to rows if possible
+                    if (i < ellipsisColsToShowGlobalCsvTokens.Length)
+                        dgvColumns.Rows[rowIndex].Cells["EllipsisColsToShowfrmSearch"].Value = ellipsisColsToShowGlobalCsvTokens[i];
+                    else
+                        dgvColumns.Rows[rowIndex].Cells["EllipsisColsToShowfrmSearch"].Value = "";
+                }
                 else
+                {
                     dgvColumns.Rows[rowIndex].Cells["EllipsisColsToShowfrmSearch"].Value = "";
+                }
+
+                // Assign EllipsisColsToAsign per-row token if present in the .dat
+                if (i < ellipsisColsToAsignTokens.Length)
+                    dgvColumns.Rows[rowIndex].Cells["EllipsisColsToAsign"].Value = ellipsisColsToAsignTokens[i];
+                else
+                    dgvColumns.Rows[rowIndex].Cells["EllipsisColsToAsign"].Value = "";
+
+                // Assign EllipsisColsToAlias per-row token if present in the .dat
+                if (i < ellipsisColsToAliasTokens.Length)
+                    dgvColumns.Rows[rowIndex].Cells["EllipsisColsToAlias"].Value = ellipsisColsToAliasTokens[i];
+                else
+                    dgvColumns.Rows[rowIndex].Cells["EllipsisColsToAlias"].Value = "";
 
                 // If this column name (alias or campo) is listed in ColsToEdit => mark Editable
                 bool shouldEdit = colsToEditTokens.Any(token =>
@@ -540,6 +663,7 @@ namespace DatEditorVDGrid
 
             MessageBox.Show("DAT cargado correctamente");
         }
+
         private string GetFullProperty(Dictionary<string, string> data, string baseKey)
         {
             var parts = new List<string>();
@@ -559,6 +683,7 @@ namespace DatEditorVDGrid
 
             return string.Join(" ", parts);
         }
+
         private List<string> SplitSqlColumns(string input)
         {
             var result = new List<string>();
@@ -658,7 +783,7 @@ namespace DatEditorVDGrid
 
             int maxLine = 255;
             int prefixLength = key.Length + 1; // key + '='
-            int chunkMax = Math.Max(1, maxLine - prefixLength);
+            int chunkMax = System.Math.Max(1, maxLine - prefixLength);
 
             var chunks = SplitSqlIntoLines(value, chunkMax);
 
@@ -766,7 +891,6 @@ namespace DatEditorVDGrid
 
         private void txtFromJoins_TextChanged(object sender, EventArgs e)
         {
-
             // Solo procesar si el último carácter es un espacio o si se borró texto
             if (txtFromJoins.Text.Length > 0 &&
                 txtFromJoins.Text[txtFromJoins.Text.Length - 1] != ' ' && !txtFromJoins.Text.EndsWith("\n"))
@@ -795,7 +919,7 @@ namespace DatEditorVDGrid
                 foreach (Match m in Regex.Matches(text, pattern, RegexOptions.IgnoreCase))
                 {
                     txtFromJoins.Select(m.Index, m.Length);
-                    if (string.Equals(kw, "ON", StringComparison.OrdinalIgnoreCase) || string.Equals(kw, "AS", StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(kw, "ON", System.StringComparison.OrdinalIgnoreCase) || string.Equals(kw, "AS", System.StringComparison.OrdinalIgnoreCase))
                         txtFromJoins.SelectionColor = keywordColor;
                     else
                         txtFromJoins.SelectionColor = joinColor;
@@ -827,13 +951,14 @@ namespace DatEditorVDGrid
         }
 
         // When the Ellipsis checkbox changes, set/clear the EllipsisSqlSources cell with the uppercase CampoSQL.
+        // DO NOT clear per-row EllipsisColsToShowfrmSearch/ToAsign/ToAlias values.
         private void dgvColumns_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 return;
 
             var colName = dgvColumns.Columns[e.ColumnIndex].Name;
-            if (!string.Equals(colName, "Ellipsis", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(colName, "Ellipsis", System.StringComparison.OrdinalIgnoreCase))
                 return;
 
             var row = dgvColumns.Rows[e.RowIndex];
@@ -845,11 +970,12 @@ namespace DatEditorVDGrid
             if (isEllipsis)
             {
                 // put uppercase CampoSQL into EllipsisSqlSources so generated .dat has a hint
+                // do not touch EllipsisColsToShowfrmSearch, EllipsisColsToAsign or EllipsisColsToAlias
                 row.Cells["EllipsisSqlSources"].Value = campo.ToUpperInvariant();
             }
             else
             {
-                // clear the per-row EllipsisSqlSources if Ellipsis unchecked
+                // if unchecked, clear ellipsis sql source but keep other per-row tokens intact
                 row.Cells["EllipsisSqlSources"].Value = "";
             }
         }
