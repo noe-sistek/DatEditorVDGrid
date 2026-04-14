@@ -65,6 +65,13 @@ namespace DatEditorVDGrid
                 HeaderText = "Requerido"
             });
 
+            
+            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
+            {
+                Name = "Editable",
+                HeaderText = "Editable"
+            });
+
             dgvColumns.Columns.Add("Header", "Header");
             dgvColumns.Columns.Add("Width", "Width");
 
@@ -120,12 +127,6 @@ namespace DatEditorVDGrid
                 HeaderText = "EllipsisColsToAlias"
             });
 
-            // editable last in row set
-            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
-            {
-                Name = "Editable",
-                HeaderText = "Editable"
-            });
 
             // Ensure edits commit immediately for checkbox handling
             dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
@@ -227,36 +228,39 @@ namespace DatEditorVDGrid
 
             var sb = new StringBuilder();
 
-            // [Source] header requerido
+            // --- Build full file with all base keys and sections in the exact order requested ---
+            // [Source]
             sb.AppendLine("[Source]");
 
-            // SourceSql (respetando 255 chars por línea y sin cortar palabras/campos)
-            AppendWrappedProperty(sb, "SourceSql", fullSql);
+            // SourceSql..SourceSql7 (always present, empty if not set)
+            WriteNumberedKeys(sb, "SourceSql", fullSql, 2);
 
-            // Procedimiento fijo
-            sb.AppendLine("Procedure=0");
+            // Procedure (leave blank if not configured)
+            string procedureVal = chkProcedure.Checked ? "1" : "";
+            sb.AppendLine($"Procedure={procedureVal}");
 
-            // Where & Order
-            AppendWrappedProperty(sb, "WhereSql", txtWhereSql.Text);
-            AppendWrappedProperty(sb, "OrderSql", txtOrderSql.Text);
-
-            // TabletoSave (use the example's key name). Prefer txtTableToSave if provided.
-            AppendWrappedProperty(sb, "TabletoSave", txtTableToSave.Text);
+            // Where & Order & TabletoSave
+            // Use single-line keys (empty if no config)
+            sb.AppendLine($"WhereSql={txtWhereSql.Text?.Trim() ?? ""}");
+            sb.AppendLine($"OrderSql={txtOrderSql.Text?.Trim() ?? ""}");
+            sb.AppendLine($"TabletoSave={txtTableToSave.Text?.Trim() ?? ""}");
 
             // DataTypes / FieldsToSave
-            AppendWrappedProperty(sb, "DataTypes", string.Join(",", dataTypes));
-            AppendWrappedProperty(sb, "FieldsToSave", string.Join(",", fieldsToSave));
+            string dataTypesVal = (dataTypes.Count > 0) ? string.Join(",", dataTypes) : "";
+            string fieldsToSaveVal = (fieldsToSave.Count > 0) ? string.Join(",", fieldsToSave) : "";
+            sb.AppendLine($"DataTypes={dataTypesVal}");
+            sb.AppendLine($"FieldsToSave={fieldsToSaveVal}");
 
             // SqlIdentityKey, CountableCol, KeyField
-            AppendWrappedProperty(sb, "SqlIdentityKey", txtSqlIdentityKey.Text?.Trim() ?? "");
-            AppendWrappedProperty(sb, "CountableCol", txtCountableCol.Text?.Trim() ?? "");
-            AppendWrappedProperty(sb, "KeyField", txtKeyField.Text);
+            sb.AppendLine($"SqlIdentityKey={txtSqlIdentityKey.Text?.Trim() ?? ""}");
+            sb.AppendLine($"CountableCol={txtCountableCol.Text?.Trim() ?? ""}");
+            sb.AppendLine($"KeyField={txtKeyField.Text?.Trim() ?? ""}");
 
             // ForeignKey / ForeignToSave / ForeignAlias
             string foreignKeyStr = txtForeignKey.Text?.Trim() ?? "";
             string foreignToSaveStr = txtForeignSave.Text?.Trim() ?? "";
-            AppendWrappedProperty(sb, "ForeignKey", foreignKeyStr);
-            AppendWrappedProperty(sb, "ForeignToSave", foreignToSaveStr);
+            sb.AppendLine($"ForeignKey={foreignKeyStr}");
+            sb.AppendLine($"ForeignToSave={foreignToSaveStr}");
 
             string foreignAliasStr = txtForeignAlias.Text?.Trim() ?? "";
             if (string.IsNullOrEmpty(foreignAliasStr) && !string.IsNullOrEmpty(foreignKeyStr))
@@ -274,23 +278,83 @@ namespace DatEditorVDGrid
                     foreignAliasStr = string.Join(",", fkTokens.Select(_ => ""));
                 }
             }
-            AppendWrappedProperty(sb, "ForeignAlias", foreignAliasStr);
+            sb.AppendLine($"ForeignAlias={foreignAliasStr}");
 
             // RequiredFields
-            AppendWrappedProperty(sb, "RequiredFields", string.Join(",", required));
+            string requiredVal = (required.Count > 0) ? string.Join(",", required) : "";
+            sb.AppendLine($"RequiredFields={requiredVal}");
 
-            // --- End of Source section keys ---
+            // [MaskedCols]
+            sb.AppendLine();
+            sb.AppendLine("[MaskedCols]");
+            sb.AppendLine($"ColComboSqlSources=");
+            sb.AppendLine($"ColComboEditables=");
 
+            // [Ellipsiscols]
+            sb.AppendLine();
+            sb.AppendLine("[Ellipsiscols]");
+
+            // EllipsisWhichOnes (comma list)
+            string ellipsisWhichVal = (ellipsisWhichOnes.Count > 0) ? string.Join(",", ellipsisWhichOnes) : "";
+            sb.AppendLine($"EllipsisWhichOnes={ellipsisWhichVal}");
+
+            // EllipsisSqlSources..3 (always present up to 6 keys)
+            // Use per-row ellipsisSqlSources joined by '~' OR per-row tokens; prefer per-row tokens processed above
+            string ellipsisSqlSourcesJoined = (ellipsisSqlSources.Count > 0) ? string.Join("~", ellipsisSqlSources) : "";
+            // If none per-row but there may be a global _globalEllipsisColsToShow we won't use it here.
+            WriteNumberedKeys(sb, "EllipsisSqlSources", ellipsisSqlSourcesJoined, 2);
+
+            // EllipsisColsWidths (single key with possible ~-joined tokens)
+            string ellipsisColsWidthsJoined = (ellipsisColsWidths.Count > 0) ? string.Join("~", ellipsisColsWidths) : "";
+            sb.AppendLine($"EllipsisColsWidths={ellipsisColsWidthsJoined}");
+
+            // EllipsisColsHeaders and additional two numbered header keys (Headers, Headers2, Headers3)
+            // We'll join per-row values with '~' and then distribute across the available header keys if needed.
+            string ellipsisColsHeadersJoined = (ellipsisColsHeaders.Count > 0) ? string.Join("~", ellipsisColsHeaders) : "";
+            WriteNumberedKeys(sb, "EllipsisColsHeaders", ellipsisColsHeadersJoined, 2);
+
+            // EllipsisColsToShowfrmSearch (single key)
+            string ellipsisColsToShowJoined = "";
+            if (ellipsisColsToShow.Any(s => !string.IsNullOrWhiteSpace(s)))
+                ellipsisColsToShowJoined = string.Join("~", ellipsisColsToShow);
+            else if (!string.IsNullOrWhiteSpace(_globalEllipsisColsToShow))
+                ellipsisColsToShowJoined = _globalEllipsisColsToShow;
+            sb.AppendLine($"EllipsisColsToShowfrmSearch={ellipsisColsToShowJoined}");
+
+            // EllipsisColsToAsign (three keys)
+            string ellipsisColsToAsignJoined = (ellipsisColsToAsign.Count > 0) ? string.Join("~", ellipsisColsToAsign) : _fullEllipsisColsToAsign ?? "";
+            WriteNumberedKeys(sb, "EllipsisColsToAsign", ellipsisColsToAsignJoined, 2);
+
+            // EllipsisColsToAlias (single key)
+            string ellipsisColsToAliasJoined = (ellipsisColsToAlias.Count > 0) ? string.Join("~", ellipsisColsToAlias) : _fullEllipsisColsToAlias ?? "";
+            sb.AppendLine($"EllipsisColsToAlias={ellipsisColsToAliasJoined}");
+
+            // Additional Ellipsis display/invoke keys (empty if not configured)
+            sb.AppendLine($"EllipsisColInvokeColor=");
+            sb.AppendLine($"EllipsisColInvokeFont=");
+            sb.AppendLine($"EllipsisColsNewFields=");
+            sb.AppendLine($"EllipsisColsNewCaption=");
+            sb.AppendLine($"EllipsisColsNewDataTypes=");
+            sb.AppendLine($"EllipsisColsNewTableNames=");
+            sb.AppendLine($"EllipsisColInvokeOpen=");
+            sb.AppendLine($"EllipsisColOpenFilters=");
+            sb.AppendLine($"EllipsisColInvokeBrowse=");
+            sb.AppendLine($"EllipsisColShellExec=");
+
+            // [Formatting]
             sb.AppendLine();
             sb.AppendLine("[Formatting]");
 
-            // Headers: unir solo headers no vacíos para evitar comas extra
-            var filteredHeaders = headers.Where(h => !string.IsNullOrWhiteSpace(h)).ToList();
-            AppendWrappedProperty(sb, "Headers", filteredHeaders.Count > 0 ? string.Join(",", filteredHeaders) : "");
+            // Headers (up to 4 keys)
+            string headersJoined = (headers.Count > 0) ? string.Join(",", headers.Where(h => !string.IsNullOrWhiteSpace(h))) : "";
+            WriteNumberedKeys(sb, "Headers", headersJoined, 2);
 
-            // Widths: mantener todos los valores
-            AppendWrappedProperty(sb, "Widths", string.Join(",", widths));
-
+            // Widths, Height, ResizeCols, ResizeRows, MoveCols, Editable, ColsToEdit, FormatStrings, etc.
+            sb.AppendLine($"Widths={string.Join(",", widths)}");
+            sb.AppendLine($"Height=");
+            sb.AppendLine($"ResizeCols=");
+            sb.AppendLine($"ResizeRows=");
+            sb.AppendLine($"MoveCols=");
             sb.AppendLine($"Editable={(chkEditable.Checked ? "1" : "0")}");
 
             // Build ColsToEdit: use Alias when present, otherwise CampoSQL; ignore empty values
@@ -306,72 +370,62 @@ namespace DatEditorVDGrid
                 .Where(s => !string.IsNullOrEmpty(s))
                 .ToList();
 
-            string colsToEdit = string.Join(",", colsToEditList);
-            AppendWrappedProperty(sb, "ColsToEdit", colsToEdit);
+            string colsToEdit = colsToEditList.Count > 0 ? string.Join(",", colsToEditList) : "";
+            sb.AppendLine($"ColsToEdit={colsToEdit}");
 
-            // FormatStrings
-            AppendWrappedProperty(sb, "FormatStrings", string.Join("~", formats));
+            // FormatStrings (use ~ for per-row format strings)
+            sb.AppendLine($"FormatStrings={string.Join("~", formats)}");
 
-            // Move all Ellipsis-related properties under [Ellipsiscols]
+            // More formatting flags
+            sb.AppendLine($"ExplorerBar=");
+            sb.AppendLine($"AutoSearch=");
+            sb.AppendLine($"SelectFullRow=");
+            sb.AppendLine($"MergeCells=");
+            sb.AppendLine($"OutlineBar=");
+            sb.AppendLine($"BlankLinesOnEdit=");
+            sb.AppendLine($"FrozenRows=");
+            sb.AppendLine($"FrozenCols=");
+            sb.AppendLine($"WordWrap=");
+
+            // [SubTotals]
             sb.AppendLine();
-            sb.AppendLine("[Ellipsiscols]");
+            sb.AppendLine("[SubTotals]");
+            sb.AppendLine($"Totales=");
+            sb.AppendLine($"MultipleSubTotals=");
+            sb.AppendLine($"SubTotalsGroups=");
+            sb.AppendLine($"SubTotalsSummary=");
+            sb.AppendLine($"SubTotalBkColors=");
+            sb.AppendLine($"SubTotalCaptions=");
+            sb.AppendLine($"SubTotalsEditable=");
+            sb.AppendLine($"DetailEditable=");
 
-            // EllipsisWhichOnes: keep comma-separated list (from per-row data)
-            if (ellipsisWhichOnes.Count > 0)
-                AppendWrappedProperty(sb, "EllipsisWhichOnes", string.Join(",", ellipsisWhichOnes));
-            else
-                AppendWrappedProperty(sb, "EllipsisWhichOnes", "");
+            // [Behavior]
+            sb.AppendLine();
+            sb.AppendLine("[Behavior]");
+            sb.AppendLine($"UpperCaseConvert=");
+            sb.AppendLine($"AllowEnterToTab=");
+            sb.AppendLine($"EnterActionNextCol=");
+            sb.AppendLine($"EnterctionNextRow=");
+            sb.AppendLine($"GoLastRowOnLoad=");
+            sb.AppendLine($"ShowColToolTips=");
+            sb.AppendLine($"DoubleClickAction=");
+            sb.AppendLine($"ReturnToCallerForm=");
+            sb.AppendLine($"CallOtherForm=");
+            sb.AppendLine($"FormToCall=");
+            sb.AppendLine($"FieldToSend=");
+            sb.AppendLine($"NewRowColor=");
+            sb.AppendLine($"ModRowColor=");
+            sb.AppendLine($"DelRowColor=");
+            sb.AppendLine($"AddAutomatically=");
+            sb.AppendLine($"BKColorByRow=");
+            sb.AppendLine($"FKColorNegativeValues=");
+            sb.AppendLine($"InsNewRowAfterCols=");
 
-            // EllipsisSqlSources: joined by ~ (one token per row) -- prefer per-row tokens
-            if (ellipsisSqlSources.Count > 0)
-                AppendWrappedProperty(sb, "EllipsisSqlSources", string.Join("~", ellipsisSqlSources));
-            else
-                AppendWrappedProperty(sb, "EllipsisSqlSources", "");
-
-            // Ellipsis cols properties: joined by ~ (top-level separator)
-            if (ellipsisColsWidths.Count > 0)
-                AppendWrappedProperty(sb, "EllipsisColsWidths", string.Join("~", ellipsisColsWidths));
-            else
-                AppendWrappedProperty(sb, "EllipsisColsWidths", "");
-
-            if (ellipsisColsHeaders.Count > 0)
-                AppendWrappedProperty(sb, "EllipsisColsHeaders", string.Join("~", ellipsisColsHeaders));
-            else
-                AppendWrappedProperty(sb, "EllipsisColsHeaders", "");
-
-            // EllipsisColsToShowfrmSearch: prefer per-row tokens if any; otherwise use global value from .dat (if present)
-            if (ellipsisColsToShow.Any(s => !string.IsNullOrWhiteSpace(s)))
-            {
-                AppendWrappedProperty(sb, "EllipsisColsToShowfrmSearch", string.Join("~", ellipsisColsToShow));
-            }
-            else if (!string.IsNullOrWhiteSpace(_globalEllipsisColsToShow))
-            {
-                AppendWrappedProperty(sb, "EllipsisColsToShowfrmSearch", _globalEllipsisColsToShow);
-            }
-            else
-            {
-                AppendWrappedProperty(sb, "EllipsisColsToShowfrmSearch", "");
-            }
-
-            // EllipsisColsToAsign: prefer per-row tokens; fallback to originally loaded full value
-            if (ellipsisColsToAsign.Any(s => !string.IsNullOrWhiteSpace(s)))
-            {
-                AppendWrappedProperty(sb, "EllipsisColsToAsign", string.Join("~", ellipsisColsToAsign));
-            }
-            else
-            {
-                AppendWrappedProperty(sb, "EllipsisColsToAsign", _fullEllipsisColsToAsign ?? "");
-            }
-
-            // EllipsisColsToAlias: prefer per-row tokens; fallback to originally loaded full value
-            if (ellipsisColsToAlias.Any(s => !string.IsNullOrWhiteSpace(s)))
-            {
-                AppendWrappedProperty(sb, "EllipsisColsToAlias", string.Join("~", ellipsisColsToAlias));
-            }
-            else
-            {
-                AppendWrappedProperty(sb, "EllipsisColsToAlias", _fullEllipsisColsToAlias ?? "");
-            }
+            // [Validate]
+            sb.AppendLine();
+            sb.AppendLine("[Validate]");
+            sb.AppendLine($"ColsSqlValid=");
+            sb.AppendLine($"ColsToAsignValues=");
 
             // show generated .dat inside richSalida only
             richSalida.Text = sb.ToString();
@@ -818,6 +872,31 @@ namespace DatEditorVDGrid
                     sb.AppendLine($"{key}={chunks[i]}");
                 else
                     sb.AppendLine($"{key}{i + 1}={chunks[i]}");
+            }
+        }
+
+        // Helper: compute wrapped chunks for a given key respecting the 255 chars limit per full line (key + '=' + chunk).
+        private List<string> GetWrappedChunks(string key, string value)
+        {
+            value = value ?? "";
+            int maxLine = 255;
+            int prefixLength = key.Length + 1; // key + '='
+            int chunkMax = System.Math.Max(1, maxLine - prefixLength);
+            return SplitSqlIntoLines(value, chunkMax);
+        }
+
+        // Helper: write numbered keys (Key, Key2, Key3...) using wrapped chunks distribution.
+        // Writes at least totalSlots entries but will expand if the wrapped chunks exceed that number
+        // so imported .dat content is not truncated.
+        private void WriteNumberedKeys(StringBuilder sb, string baseKey, string value, int totalSlots)
+        {
+            var chunks = GetWrappedChunks(baseKey, value);
+            int count = Math.Max(totalSlots, chunks.Count);
+            for (int i = 0; i < count; i++)
+            {
+                string key = (i == 0) ? baseKey : $"{baseKey}{i + 1}";
+                string val = (i < chunks.Count) ? chunks[i] : "";
+                sb.AppendLine($"{key}={val}");
             }
         }
 
