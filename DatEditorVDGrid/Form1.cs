@@ -61,6 +61,11 @@ namespace DatEditorVDGrid
             dgvColumns.Columns.Add("Format", "Formato");
 
             // NEW: EllipsisColsWidths, EllipsisColsHeaders, EllipsisColsToShowfrmSearch (text per row)
+            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
+            {
+                Name = "Ellipsis",
+                HeaderText = "Ellipsis"
+            });
             dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
             {
                 Name = "EllipsisColsWidths",
@@ -84,12 +89,6 @@ namespace DatEditorVDGrid
                 HeaderText = "EllipsisSqlSources"
             };
             dgvColumns.Columns.Add(ellipsisSourceCol);
-
-            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
-            {
-                Name = "Ellipsis",
-                HeaderText = "Ellipsis"
-            });
 
             // Ensure edits commit immediately for checkbox handling
             dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
@@ -191,20 +190,61 @@ namespace DatEditorVDGrid
             // Procedimiento fijo
             sb.AppendLine("Procedure=0");
 
-            // WhereSql, OrderSql, TableToSave y demás propiedades simples (también respetan 255)
-            AppendWrappedProperty(sb, "WhereSql", txtWhere.Text);
-            AppendWrappedProperty(sb, "OrderSql", txtOrder.Text);
-            AppendWrappedProperty(sb, "TableToSave", txtTable.Text);
+            // --- Now produce the keys in the exact order required by your example ---
+            // WhereSql, OrderSql, TabletoSave (note: using the exact key name from your example),
+            // DataTypes, FieldsToSave, SqlIdentityKey, CountableCol, KeyField,
+            // ForeignKey, ForeignToSave, ForeignAlias, RequiredFields
 
-            // DataTypes, FieldsToSave, RequiredFields
+            // Where & Order
+            AppendWrappedProperty(sb, "WhereSql", txtWhereSql.Text);
+            AppendWrappedProperty(sb, "OrderSql", txtOrderSql.Text);
+
+            // TabletoSave (use the example's key name). Prefer txtTableToSave if provided.
+            AppendWrappedProperty(sb, "TabletoSave", txtTableToSave.Text);
+
+            // DataTypes / FieldsToSave
             AppendWrappedProperty(sb, "DataTypes", string.Join(",", dataTypes));
             AppendWrappedProperty(sb, "FieldsToSave", string.Join(",", fieldsToSave));
+
+            // SqlIdentityKey: take from the dedicated textbox
+            string sqlIdentity = txtSqlIdentityKey.Text?.Trim() ?? "";
+            AppendWrappedProperty(sb, "SqlIdentityKey", sqlIdentity);
+
+            // CountableCol: use txtCountableCol
+            AppendWrappedProperty(sb, "CountableCol", txtCountableCol.Text?.Trim() ?? "");
+
+            // KeyField
+            AppendWrappedProperty(sb, "KeyField", txtKeyField.Text);
+
+            // ForeignKey / ForeignToSave
+            string foreignKeyStr = txtForeignKey.Text?.Trim() ?? "";
+            string foreignToSaveStr = txtForeignSave.Text?.Trim() ?? "";
+            AppendWrappedProperty(sb, "ForeignKey", foreignKeyStr);
+            AppendWrappedProperty(sb, "ForeignToSave", foreignToSaveStr);
+
+            // ForeignAlias: prefer explicit textbox; otherwise infer main alias or emit placeholders
+            string foreignAliasStr = txtForeignAlias.Text?.Trim() ?? "";
+            if (string.IsNullOrEmpty(foreignAliasStr) && !string.IsNullOrEmpty(foreignKeyStr))
+            {
+                string inferredAlias = ExtractMainTableAliasFromFromPart(fromJoins);
+                var fkTokens = foreignKeyStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .ToArray();
+                if (!string.IsNullOrEmpty(inferredAlias))
+                {
+                    foreignAliasStr = string.Join(",", fkTokens.Select(_ => inferredAlias));
+                }
+                else
+                {
+                    foreignAliasStr = string.Join(",", fkTokens.Select(_ => ""));
+                }
+            }
+            AppendWrappedProperty(sb, "ForeignAlias", foreignAliasStr);
+
+            // RequiredFields
             AppendWrappedProperty(sb, "RequiredFields", string.Join(",", required));
 
-            // Llaves y foreigns
-            AppendWrappedProperty(sb, "KeyField", txtKey.Text);
-            AppendWrappedProperty(sb, "ForeignKey", txtForeign.Text);
-            AppendWrappedProperty(sb, "ForeignToSave", txtForeignSave.Text);
+            // --- End of Source section keys ---
 
             sb.AppendLine();
             sb.AppendLine("[Formatting]");
@@ -347,23 +387,34 @@ namespace DatEditorVDGrid
             // separar SELECT vs FROM+JOINS
             SplitSelectFrom(fullSource, out string selectOnly, out string fromPart);
 
-            // si el .dat ya trae TableToSave, usarlo; si no, extraer la tabla principal desde FROM
-            if (data.ContainsKey("TableToSave"))
-            {
-                txtTable.Text = data["TableToSave"];
-            }
+            // si el .dat trae TabletoSave o TableToSave, preferirla; si no, extraer la tabla principal desde FROM
+            string tableVal = "";
+            if (data.ContainsKey("TabletoSave"))
+                tableVal = GetFullProperty(data, "TabletoSave");
+            else if (data.ContainsKey("TableToSave"))
+                tableVal = GetFullProperty(data, "TableToSave");
+
+            if (!string.IsNullOrWhiteSpace(tableVal))
+                txtTableToSave.Text = tableVal;
             else
-            {
-                txtTable.Text = ExtractMainTableFromFromPart(fromPart);
-            }
+                txtTableToSave.Text = ExtractMainTableFromFromPart(fromPart);
 
             // completar controles de configuración desde .dat
-            txtWhere.Text = data.ContainsKey("WhereSql") ? GetFullProperty(data, "WhereSql") : "";
-            txtOrder.Text = data.ContainsKey("OrderSql") ? GetFullProperty(data, "OrderSql") : "";
-            txtKey.Text = data.ContainsKey("KeyField") ? GetFullProperty(data, "KeyField") : "";
-            txtForeign.Text = data.ContainsKey("ForeignKey") ? GetFullProperty(data, "ForeignKey") : "";
+            txtWhereSql.Text = data.ContainsKey("WhereSql") ? GetFullProperty(data, "WhereSql") : "";
+            txtOrderSql.Text = data.ContainsKey("OrderSql") ? GetFullProperty(data, "OrderSql") : "";
+            // KeyField
+            txtKeyField.Text = data.ContainsKey("KeyField") ? GetFullProperty(data, "KeyField") : "";
+            // ForeignKey / ForeignToSave
+            txtForeignKey.Text = data.ContainsKey("ForeignKey") ? GetFullProperty(data, "ForeignKey") : "";
             txtForeignSave.Text = data.ContainsKey("ForeignToSave") ? GetFullProperty(data, "ForeignToSave") : "";
-            chkEditable.Checked = data.ContainsKey("Editable") && data["Editable"] == "1";
+            // Procedure flag (if provided)
+            if (data.ContainsKey("Procedure"))
+                chkProcedure.Checked = GetFullProperty(data, "Procedure").Trim() != "0";
+            // SqlIdentityKey, CountableCol, ForeignAlias
+            txtSqlIdentityKey.Text = data.ContainsKey("SqlIdentityKey") ? GetFullProperty(data, "SqlIdentityKey") : "";
+            txtCountableCol.Text = data.ContainsKey("CountableCol") ? GetFullProperty(data, "CountableCol") : "";
+            txtForeignAlias.Text = data.ContainsKey("ForeignAlias") ? GetFullProperty(data, "ForeignAlias") : "";
+            chkEditable.Checked = data.ContainsKey("Editable") && GetFullProperty(data, "Editable").Trim() == "1";
 
             // From+Joins se muestra en txtFromJoins (control para editar o mantener)
             txtFromJoins.Text = fromPart?.Trim() ?? "";
@@ -558,10 +609,7 @@ namespace DatEditorVDGrid
         {
             var result = new List<string>();
 
-            //if (string.IsNullOrEmpty(sql))
-            //    return result;
-
-            sql = sql.Trim();
+            sql = (sql ?? "").Trim();
 
             while (sql.Length > maxChunkLength)
             {
@@ -634,7 +682,7 @@ namespace DatEditorVDGrid
             selectPart = fullSql;
             fromPart = "";
 
-            var lower = fullSql.ToLower();
+            var lower = (fullSql ?? "").ToLower();
             int idx = lower.IndexOf(" from ");
             if (idx >= 0)
             {
@@ -647,12 +695,9 @@ namespace DatEditorVDGrid
         // Si no puede identificar, devuelve cadena vacía.
         private string ExtractMainTableFromFromPart(string fromPart)
         {
-            //if (string.IsNullOrWhiteSpace(fromPart))
-            //    return "";
-
-            var lower = fromPart.ToLower();
+            var lower = (fromPart ?? "").ToLower();
             int idxFrom = lower.IndexOf("from");
-            string tail = (idxFrom >= 0) ? fromPart.Substring(idxFrom + 4).Trim() : fromPart.Trim();
+            string tail = (idxFrom >= 0) ? fromPart.Substring(idxFrom + 4).Trim() : (fromPart ?? "").Trim();
 
             // cortar antes de WHERE/ORDER/GROUP/HAVING/LIMIT
             string[] terminators = new[] { " where ", " order ", " group ", " having ", " limit " };
@@ -680,6 +725,43 @@ namespace DatEditorVDGrid
 
             // tokens[0] es la tabla principal (puede ser schema.table)
             return tokens[0];
+        }
+
+        // Extrae el alias principal (si existe) junto a la tabla en FROM.
+        // Por ejemplo: "from TalRecepcionDet d inner join ..." -> devuelve "d"
+        private string ExtractMainTableAliasFromFromPart(string fromPart)
+        {
+            if (string.IsNullOrWhiteSpace(fromPart))
+                return "";
+
+            var lower = fromPart.ToLower();
+            int idxFrom = lower.IndexOf("from");
+            string tail = (idxFrom >= 0) ? fromPart.Substring(idxFrom + 4).Trim() : fromPart.Trim();
+
+            // cortar antes de WHERE/ORDER/GROUP/HAVING/LIMIT
+            string[] terminators = new[] { " where ", " order ", " group ", " having ", " limit " };
+            int endIdx = -1;
+            foreach (var t in terminators)
+            {
+                int p = tail.ToLower().IndexOf(t);
+                if (p >= 0)
+                {
+                    if (endIdx < 0 || p < endIdx) endIdx = p;
+                }
+            }
+            if (endIdx >= 0) tail = tail.Substring(0, endIdx).Trim();
+
+            var tokens = tail.Split(new[] { ' ', '\t', '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length < 2)
+                return ""; // no alias token present
+
+            // tokens[0] = table, tokens[1] might be alias unless it's a join keyword
+            var candidate = tokens[1];
+            string[] reserved = new[] { "inner", "left", "right", "full", "outer", "join", "on", "as" };
+            if (reserved.Contains(candidate.ToLower()))
+                return "";
+
+            return candidate;
         }
 
         private void txtFromJoins_TextChanged(object sender, EventArgs e)
