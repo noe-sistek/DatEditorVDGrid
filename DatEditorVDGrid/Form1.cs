@@ -1025,5 +1025,85 @@ namespace DatEditorVDGrid
         {
 
         }
+        private void btnFillValues_Click(object sender, EventArgs e)
+        {
+            // Columns to ensure default "0" values for ellipsis-related fields (per-row)
+            var ellipsisCols = new[]
+            {
+        "EllipsisSqlSources",
+        "EllipsisColsWidths",
+        "EllipsisColsHeaders",
+        "EllipsisColsToShowfrmSearch",
+        "EllipsisColsToAsign",
+        "EllipsisColsToAlias",
+        // validate tokens
+        "ColsSqlValidToken",
+        "ColsToAsignValuesToken"
+    };
+
+            int filled = 0;
+
+            foreach (DataGridViewRow row in dgvColumns.Rows)
+            {
+                if (row.IsNewRow)
+                    continue;
+
+                // Only fill rows that actually represent a field (CampoSQL present)
+                var campoRaw = row.Cells["CampoSQL"]?.Value?.ToString();
+                if (string.IsNullOrWhiteSpace(campoRaw))
+                    continue;
+
+                // 1) Fill Header with field name without table prefix when empty
+                if (dgvColumns.Columns.Contains("Header"))
+                {
+                    var headerCell = row.Cells["Header"];
+                    var headerVal = headerCell?.Value?.ToString();
+                    if (string.IsNullOrWhiteSpace(headerVal))
+                    {
+                        headerCell.Value = StripTablePrefix(campoRaw);
+                        filled++;
+                    }
+                }
+
+                // 2) Ensure Width and Format default to "0" when empty
+                if (dgvColumns.Columns.Contains("Width"))
+                {
+                    var widthCell = row.Cells["Width"];
+                    if (string.IsNullOrWhiteSpace(widthCell?.Value?.ToString()))
+                    {
+                        widthCell.Value = "0";
+                        filled++;
+                    }
+                }
+
+                if (dgvColumns.Columns.Contains("Format"))
+                {
+                    var fmtCell = row.Cells["Format"];
+                    if (string.IsNullOrWhiteSpace(fmtCell?.Value?.ToString()))
+                    {
+                        fmtCell.Value = "0";
+                        filled++;
+                    }
+                }
+
+                // 3) Per-row ellipsis/validate tokens -> set "0" when empty
+                foreach (var colName in ellipsisCols)
+                {
+                    if (!dgvColumns.Columns.Contains(colName))
+                        continue;
+
+                    var cell = row.Cells[colName];
+                    var raw = cell?.Value?.ToString();
+
+                    if (string.IsNullOrWhiteSpace(raw))
+                    {
+                        cell.Value = "0";
+                        filled++;
+                    }
+                }
+            }
+
+            MessageBox.Show($"Valores por defecto agregados: {filled}", "Auto-fill", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
     }//Form
 }//namespace
