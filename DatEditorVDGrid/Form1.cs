@@ -24,9 +24,11 @@ namespace DatEditorVDGrid
         private string _fullEllipsisColsToAsign = "";
         private string _fullEllipsisColsToAlias = "";
 
-        // Preserve behavior and formatting properties loaded from the .dat so we can re-emit them unchanged
+        // Preserve behavior, formatting, masked and ellipsis extra properties loaded from the .dat so we can re-emit them unchanged
         private readonly Dictionary<string, string> _behaviorProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _formattingProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _maskedProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _ellipsisExtraProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Syntax/coloring settings for SQL keywords and output separators
         private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
@@ -203,6 +205,17 @@ namespace DatEditorVDGrid
             return name;
         }
 
+        // Helper: return preserved value if present otherwise create a repeated "0" token list of length count using sep
+        private static string PreserveOrRepeat(Dictionary<string, string> dict, string key, char sep, int count)
+        {
+            if (dict != null && dict.TryGetValue(key, out var val) && !string.IsNullOrEmpty(val))
+                return val;
+            if (count <= 0)
+                return "";
+            var token = "0";
+            return string.Join(sep.ToString(), Enumerable.Repeat(token, count));
+        }
+
         private void btnGenerate_Click(object sender, EventArgs e)
         {
             // Only include rows with a non-empty CampoSQL (avoid generating many empty tokens)
@@ -210,6 +223,8 @@ namespace DatEditorVDGrid
                 .Cast<DataGridViewRow>()
                 .Where(r => !string.IsNullOrWhiteSpace(r.Cells["CampoSQL"].Value?.ToString()))
                 .ToList();
+
+            int fieldCount = filas.Count;
 
             var selectParts = new List<string>();
             var dataTypes = new List<string>();
@@ -377,8 +392,14 @@ namespace DatEditorVDGrid
             // [MaskedCols]
             sb.AppendLine();
             sb.AppendLine("[MaskedCols]");
-            sb.AppendLine($"ColComboSqlSources=");
-            sb.AppendLine($"ColComboEditables=");
+
+            // ColComboSqlSources: use preserved value or generate "~" separated zeros count = fieldCount
+            var colComboSqlSourcesVal = PreserveOrRepeat(_maskedProps, "ColComboSqlSources", '~', fieldCount);
+            sb.AppendLine($"ColComboSqlSources={colComboSqlSourcesVal}");
+
+            // ColComboEditables: preserved or comma-separated zeros
+            var colComboEditablesVal = PreserveOrRepeat(_maskedProps, "ColComboEditables", ',', fieldCount);
+            sb.AppendLine($"ColComboEditables={colComboEditablesVal}");
 
             // [Ellipsiscols]
             sb.AppendLine();
@@ -389,7 +410,6 @@ namespace DatEditorVDGrid
             sb.AppendLine($"EllipsisWhichOnes={ellipsisWhichVal}");
 
             // EllipsisSqlSources..3 (always present up to 6 keys)
-            // Use per-row ellipsisSqlSources joined by '~' OR per-row tokens; prefer per-row tokens processed above
             string ellipsisSqlSourcesJoined = (ellipsisSqlSources.Count > 0) ? string.Join("~", ellipsisSqlSources) : "";
             DatWriterHelper.WriteNumberedKeys(sb, "EllipsisSqlSources", ellipsisSqlSourcesJoined, 2);
 
@@ -397,8 +417,7 @@ namespace DatEditorVDGrid
             string ellipsisColsWidthsJoined = (ellipsisColsWidths.Count > 0) ? string.Join("~", ellipsisColsWidths) : "";
             sb.AppendLine($"EllipsisColsWidths={ellipsisColsWidthsJoined}");
 
-            // EllipsisColsHeaders and additional two numbered header keys (Headers, Headers2, Headers3)
-            // We'll join per-row values with '~' and then distribute across the available header keys if needed.
+            // EllipsisColsHeaders and numbered header keys
             string ellipsisColsHeadersJoined = (ellipsisColsHeaders.Count > 0) ? string.Join("~", ellipsisColsHeaders) : "";
             DatWriterHelper.WriteNumberedKeys(sb, "EllipsisColsHeaders", ellipsisColsHeadersJoined, 2);
 
@@ -418,17 +437,41 @@ namespace DatEditorVDGrid
             string ellipsisColsToAliasJoined = (ellipsisColsToAlias.Count > 0) ? string.Join("~", ellipsisColsToAlias) : _fullEllipsisColsToAlias ?? "";
             sb.AppendLine($"EllipsisColsToAlias={ellipsisColsToAliasJoined}");
 
-            // Additional Ellipsis display/invoke keys (empty if not configured)
-            sb.AppendLine($"EllipsisColInvokeColor=");
-            sb.AppendLine($"EllipsisColInvokeFont=");
-            sb.AppendLine($"EllipsisColsNewFields=");
-            sb.AppendLine($"EllipsisColsNewCaption=");
-            sb.AppendLine($"EllipsisColsNewDataTypes=");
-            sb.AppendLine($"EllipsisColsNewTableNames=");
-            sb.AppendLine($"EllipsisColInvokeOpen=");
-            sb.AppendLine($"EllipsisColOpenFilters=");
-            sb.AppendLine($"EllipsisColInvokeBrowse=");
-            sb.AppendLine($"EllipsisColShellExec=");
+            // Now emit the remaining ellipsis extra properties (preserve or generate appropriate zeros)
+            // Keys and their separators based on production examples:
+            // - EllipsisColInvokeColor -> comma
+            // - EllipsisColInvokeFont -> comma
+            // - EllipsisColsNewFields -> ~
+            // - EllipsisColsNewCaption -> ~
+            // - EllipsisColsNewDataTypes -> ~
+            // - EllipsisColsNewTableNames -> comma
+            // - EllipsisColInvokeOpen -> comma
+            // - EllipsisColOpenFilters -> ~
+            // - EllipsisColInvokeBrowse -> comma
+            // - EllipsisColShellExec -> comma
+
+            sb.AppendLine($"EllipsisColInvokeColor={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeColor", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColInvokeFont={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeFont", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewFields={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewFields", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewCaption={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewCaption", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewDataTypes={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewDataTypes", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewTableNames={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewTableNames", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColInvokeOpen={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeOpen", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColOpenFilters={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColOpenFilters", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColInvokeBrowse={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeBrowse", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColShellExec={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColShellExec", ',', fieldCount)}");
+
+            // Additional Ellipsis display/invoke keys (other keys kept empty for now if not preserved)
+            //sb.AppendLine($"EllipsisColInvokeColor2=");
+            //sb.AppendLine($"EllipsisColInvokeFont2=");
+            //sb.AppendLine($"EllipsisColsNewFields2=");
+            //sb.AppendLine($"EllipsisColsNewCaption2=");
+            //sb.AppendLine($"EllipsisColsNewDataTypes2=");
+            //sb.AppendLine($"EllipsisColsNewTableNames2=");
+            //sb.AppendLine($"EllipsisColInvokeOpen2=");
+            //sb.AppendLine($"EllipsisColOpenFilters2=");
+            //sb.AppendLine($"EllipsisColInvokeBrowse2=");
+            //sb.AppendLine($"EllipsisColShellExec2=");
 
             // [Formatting]
             sb.AppendLine();
@@ -599,6 +642,8 @@ namespace DatEditorVDGrid
             _fullEllipsisColsToAlias = "";
             _behaviorProps.Clear();
             _formattingProps.Clear();
+            _maskedProps.Clear();
+            _ellipsisExtraProps.Clear();
 
             var fullSource = DatService.GetFullProperty(data, "SourceSql");
 
@@ -689,6 +734,38 @@ namespace DatEditorVDGrid
             {
                 if (data.ContainsKey(k))
                     _formattingProps[k] = DatService.GetFullProperty(data, k) ?? "";
+            }
+
+            // Preserve MaskedCols keys
+            string[] maskedKeys = new[]
+            {
+                "ColComboSqlSources",
+                "ColComboEditables"
+            };
+            foreach (var k in maskedKeys)
+            {
+                if (data.ContainsKey(k))
+                    _maskedProps[k] = DatService.GetFullProperty(data, k) ?? "";
+            }
+
+            // Preserve ellipsis extra properties
+            string[] ellipsisExtraKeys = new[]
+            {
+                "EllipsisColInvokeColor",
+                "EllipsisColInvokeFont",
+                "EllipsisColsNewFields",
+                "EllipsisColsNewCaption",
+                "EllipsisColsNewDataTypes",
+                "EllipsisColsNewTableNames",
+                "EllipsisColInvokeOpen",
+                "EllipsisColOpenFilters",
+                "EllipsisColInvokeBrowse",
+                "EllipsisColShellExec"
+            };
+            foreach (var k in ellipsisExtraKeys)
+            {
+                if (data.ContainsKey(k))
+                    _ellipsisExtraProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
             // From+Joins se muestra en richSelect (control independiente)
