@@ -24,6 +24,9 @@ namespace DatEditorVDGrid
         private string _fullEllipsisColsToAsign = "";
         private string _fullEllipsisColsToAlias = "";
 
+        // Preserve behavior properties loaded from the .dat so we can re-emit them unchanged
+        private readonly Dictionary<string, string> _behaviorProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         // Syntax/coloring settings for SQL keywords and output separators
         private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
         private readonly Color _joinColor = Color.Blue;
@@ -152,6 +155,12 @@ namespace DatEditorVDGrid
                 HeaderText = "ColsToAsignValues"
             });
 
+            // Behavior: per-row flag to include this field in InsNewRowAfterCols
+            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
+            {
+                Name = "InsNewRowAfter",
+                HeaderText = "InsNewRowAfter"
+            });
 
             // Ensure edits commit immediately for checkbox handling
             //dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
@@ -184,6 +193,17 @@ namespace DatEditorVDGrid
             dgvColumns.Rows[rowIndex].Cells["CampoSQL"].Value = "";
         }
 
+        // Helper: strip table alias prefix if present (e.g. "d.Cantidad" => "Cantidad")
+        private static string StripTablePrefix(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return name;
+            var idx = name.LastIndexOf('.');
+            if (idx >= 0 && idx < name.Length - 1)
+                return name.Substring(idx + 1);
+            return name;
+        }
+
         private void btnGenerate_Click(object sender, EventArgs e)
         {
             // Only include rows with a non-empty CampoSQL (avoid generating many empty tokens)
@@ -214,6 +234,9 @@ namespace DatEditorVDGrid
             var colsSqlValidTokens = new List<string>();
             var colsToAsignTokens = new List<string>();
 
+            // Behavior InsNewRowAfter selection
+            var insNewRowSelected = new List<string>();
+
             foreach (var row in filas)
             {
                 string campo = row.Cells["CampoSQL"].Value?.ToString();
@@ -241,6 +264,16 @@ namespace DatEditorVDGrid
                 bool validate = Convert.ToBoolean(row.Cells["Validate"].Value ?? false);
                 string colSqlValid = row.Cells["ColsSqlValidToken"].Value?.ToString() ?? "";
                 string colAsignVal = row.Cells["ColsToAsignValuesToken"].Value?.ToString() ?? "";
+
+                // InsNewRowAfter checkbox
+                bool insNewAfter = Convert.ToBoolean(row.Cells["InsNewRowAfter"].Value ?? false);
+                if (insNewAfter)
+                {
+                    // prefer alias when present otherwise campo name WITHOUT table prefix
+                    var fieldName = !string.IsNullOrWhiteSpace(alias) ? alias : StripTablePrefix(campo);
+                    if (!string.IsNullOrEmpty(fieldName))
+                        insNewRowSelected.Add(fieldName);
+                }
 
                 // select parts
                 selectParts.Add(string.IsNullOrWhiteSpace(alias) ? $"{campo}" : $"{campo} {alias}");
@@ -415,7 +448,7 @@ namespace DatEditorVDGrid
             sb.AppendLine($"MoveCols=");
             sb.AppendLine($"Editable={(chkEditable.Checked ? "1" : "0")}");
 
-            // Build ColsToEdit: use Alias when present, otherwise CampoSQL; ignore empty values
+            // Build ColsToEdit: use Alias when present, otherwise CampoSQL stripped of table prefix; ignore empty values
             var colsToEditList = filas
                 .Where(r => Convert.ToBoolean(r.Cells["Editable"].Value ?? false))
                 .Select(r =>
@@ -423,7 +456,7 @@ namespace DatEditorVDGrid
                     var alias = (r.Cells["Alias"].Value ?? "").ToString().Trim();
                     if (!string.IsNullOrEmpty(alias))
                         return alias;
-                    return (r.Cells["CampoSQL"].Value ?? "").ToString().Trim();
+                    return StripTablePrefix((r.Cells["CampoSQL"].Value ?? "").ToString().Trim());
                 })
                 .Where(s => !string.IsNullOrEmpty(s))
                 .ToList();
@@ -460,24 +493,40 @@ namespace DatEditorVDGrid
             // [Behavior]
             sb.AppendLine();
             sb.AppendLine("[Behavior]");
-            sb.AppendLine($"UpperCaseConvert=");
-            sb.AppendLine($"AllowEnterToTab=");
-            sb.AppendLine($"EnterActionNextCol=");
-            sb.AppendLine($"EnterctionNextRow=");
-            sb.AppendLine($"GoLastRowOnLoad=");
-            sb.AppendLine($"ShowColToolTips=");
-            sb.AppendLine($"DoubleClickAction=");
-            sb.AppendLine($"ReturnToCallerForm=");
-            sb.AppendLine($"CallOtherForm=");
-            sb.AppendLine($"FormToCall=");
-            sb.AppendLine($"FieldToSend=");
-            sb.AppendLine($"NewRowColor=");
-            sb.AppendLine($"ModRowColor=");
-            sb.AppendLine($"DelRowColor=");
-            sb.AppendLine($"AddAutomatically=");
-            sb.AppendLine($"BKColorByRow=");
-            sb.AppendLine($"FKColorNegativeValues=");
-            sb.AppendLine($"InsNewRowAfterCols=");
+
+            // Known behavior keys we preserve when present in the imported .dat.
+            string[] behaviorKeys = new[]
+            {
+                "UpperCaseConvert",
+                "AllowEnterToTab",
+                "EnterActionNextCol",
+                "EnterctionNextRow",
+                "GoLastRowOnLoad",
+                "ShowColToolTips",
+                "DoubleClickAction",
+                "ReturnToCallerForm",
+                "CallOtherForm",
+                "FormToCall",
+                "FieldToSend",
+                "NewRowColor",
+                "ModRowColor",
+                "DelRowColor",
+                "AddAutomatically",
+                "BKColorByRow",
+                "FKColorNegativeValues"
+                // InsNewRowAfterCols handled below (we want to override it with selections when present)
+            };
+
+            // Emit preserved behavior keys in the same order; if not present keep empty
+            foreach (var key in behaviorKeys)
+            {
+                var val = _behaviorProps.ContainsKey(key) ? _behaviorProps[key] : "";
+                sb.AppendLine($"{key}={val}");
+            }
+
+            // InsNewRowAfterCols: prefer generated CSV from per-row checkboxes; if none selected, emit original value preserved
+            string insJoined = insNewRowSelected.Count > 0 ? string.Join(",", insNewRowSelected) : (_behaviorProps.ContainsKey("InsNewRowAfterCols") ? _behaviorProps["InsNewRowAfterCols"] : "");
+            sb.AppendLine($"InsNewRowAfterCols={insJoined}");
 
             // [Validate]
             sb.AppendLine();
@@ -547,6 +596,7 @@ namespace DatEditorVDGrid
             _globalEllipsisColsToShow = "";
             _fullEllipsisColsToAsign = "";
             _fullEllipsisColsToAlias = "";
+            _behaviorProps.Clear();
 
             //var fullSource = DatService.GetFullProperty(data, "SourceSql");
             var fullSource = DatService.GetFullProperty(data, "SourceSql");
@@ -588,6 +638,34 @@ namespace DatEditorVDGrid
                 _fullEllipsisColsToAsign = DatService.GetFullProperty(data, "EllipsisColsToAsign");
             if (data.ContainsKey("EllipsisColsToAlias"))
                 _fullEllipsisColsToAlias = DatService.GetFullProperty(data, "EllipsisColsToAlias");
+
+            // Preserve Behavior keys found in the imported .dat so we can write them back unchanged later
+            string[] behaviorKeysToPreserve = new[]
+            {
+                "UpperCaseConvert",
+                "AllowEnterToTab",
+                "EnterActionNextCol",
+                "EnterctionNextRow",
+                "GoLastRowOnLoad",
+                "ShowColToolTips",
+                "DoubleClickAction",
+                "ReturnToCallerForm",
+                "CallOtherForm",
+                "FormToCall",
+                "FieldToSend",
+                "NewRowColor",
+                "ModRowColor",
+                "DelRowColor",
+                "AddAutomatically",
+                "BKColorByRow",
+                "FKColorNegativeValues",
+                "InsNewRowAfterCols"
+            };
+            foreach (var k in behaviorKeysToPreserve)
+            {
+                if (data.ContainsKey(k))
+                    _behaviorProps[k] = DatService.GetFullProperty(data, k) ?? "";
+            }
 
             // From+Joins se muestra en richSelect (control independiente)
             try
@@ -698,6 +776,12 @@ namespace DatEditorVDGrid
                 ? new string[0]
                 : fullColsToAsignValues.Split(new[] { '~' }, StringSplitOptions.None);
 
+            // NEW: load InsNewRowAfterCols tokens (behavior) to mark per-row checkbox
+            var fullInsNewRowAfter = _behaviorProps.ContainsKey("InsNewRowAfterCols") ? _behaviorProps["InsNewRowAfterCols"] : "";
+            var insNewRowTokens = string.IsNullOrWhiteSpace(fullInsNewRowAfter)
+                ? new string[0]
+                : fullInsNewRowAfter.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToArray();
+
             for (int i = 0; i < campos.Count; i++)
             {
                 var parts = campos[i].Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -797,10 +881,16 @@ namespace DatEditorVDGrid
                 bool shouldValidate = (!(string.IsNullOrEmpty(tokSql) || tokSql == "0") || !(string.IsNullOrEmpty(tokAsign) || tokAsign == "0"));
                 dgvColumns.Rows[rowIndex].Cells["Validate"].Value = shouldValidate;
 
-                // If this column name (alias or campo) is listed in ColsToEdit => mark Editable
+                // Mark InsNewRowAfter checkbox if this field is present in imported InsNewRowAfterCols
+                bool insMark = insNewRowTokens.Any(t =>
+                    string.Equals(t, alias, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(t, StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
+                dgvColumns.Rows[rowIndex].Cells["InsNewRowAfter"].Value = insMark;
+
+                // If this column name (alias or campo without table prefix) is listed in ColsToEdit => mark Editable
                 bool shouldEdit = colsToEditTokens.Any(token =>
                     string.Equals(token, alias, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(token, campo, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(token, StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
 
                 dgvColumns.Rows[rowIndex].Cells["Editable"].Value = shouldEdit;
             }
@@ -830,7 +920,6 @@ namespace DatEditorVDGrid
                 true
             );
         }
-
         private void dgvColumns_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
 
