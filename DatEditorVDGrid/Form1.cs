@@ -68,7 +68,7 @@ namespace DatEditorVDGrid
                 HeaderText = "Requerido"
             });
 
-            
+
             dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
             {
                 Name = "Editable",
@@ -130,6 +130,28 @@ namespace DatEditorVDGrid
                 HeaderText = "EllipsisColsToAlias"
             });
 
+            // Validate-related columns: allow per-row edit of validate tokens
+            // 1) Validate flag (checkbox)
+            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
+            {
+                Name = "Validate",
+                HeaderText = "Validate"
+            });
+
+            // 2) ColsSqlValid per-row token (joined with ~ when writing)
+            dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
+            {
+                Name = "ColsSqlValidToken",
+                HeaderText = "ColsSqlValid"
+            });
+
+            // 3) ColsToAsignValues per-row token
+            dgvColumns.Columns.Add(new DataGridViewTextBoxColumn()
+            {
+                Name = "ColsToAsignValuesToken",
+                HeaderText = "ColsToAsignValues"
+            });
+
 
             // Ensure edits commit immediately for checkbox handling
             //dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
@@ -187,6 +209,11 @@ namespace DatEditorVDGrid
             var ellipsisColsToAsign = new List<string>();
             var ellipsisColsToAlias = new List<string>();
 
+            // Validate per-row tokens
+            var validateFlags = new List<string>();
+            var colsSqlValidTokens = new List<string>();
+            var colsToAsignTokens = new List<string>();
+
             foreach (var row in filas)
             {
                 string campo = row.Cells["CampoSQL"].Value?.ToString();
@@ -210,6 +237,11 @@ namespace DatEditorVDGrid
                 string eAsign = row.Cells["EllipsisColsToAsign"].Value?.ToString() ?? "";
                 string eAlias = row.Cells["EllipsisColsToAlias"].Value?.ToString() ?? "";
 
+                // Validate tokens (new per-row values)
+                bool validate = Convert.ToBoolean(row.Cells["Validate"].Value ?? false);
+                string colSqlValid = row.Cells["ColsSqlValidToken"].Value?.ToString() ?? "";
+                string colAsignVal = row.Cells["ColsToAsignValuesToken"].Value?.ToString() ?? "";
+
                 // select parts
                 selectParts.Add(string.IsNullOrWhiteSpace(alias) ? $"{campo}" : $"{campo} {alias}");
                 dataTypes.Add(tipo);
@@ -227,6 +259,11 @@ namespace DatEditorVDGrid
                 ellipsisColsToShow.Add(eShow);
                 ellipsisColsToAsign.Add(eAsign);
                 ellipsisColsToAlias.Add(eAlias);
+
+                // collect validate tokens per row
+                validateFlags.Add(validate ? "1" : "0");
+                colsSqlValidTokens.Add(string.IsNullOrEmpty(colSqlValid) ? "0" : colSqlValid);
+                colsToAsignTokens.Add(string.IsNullOrEmpty(colAsignVal) ? "0" : colAsignVal);
             }
 
             // Trim trailing empty tokens for per-row lists (only for things using ~ separators)
@@ -236,6 +273,10 @@ namespace DatEditorVDGrid
             DatWriterHelper.TrimTrailingEmpty(ellipsisColsToShow);
             DatWriterHelper.TrimTrailingEmpty(ellipsisColsToAsign);
             DatWriterHelper.TrimTrailingEmpty(ellipsisColsToAlias);
+
+            // Also trim trailing "0" placeholders from validate token lists so output is compact
+            DatWriterHelper.TrimTrailingEmpty(colsSqlValidTokens);
+            DatWriterHelper.TrimTrailingEmpty(colsToAsignTokens);
 
             // construir SELECT respetando que los campos no contengan coma adicional
             string selectClause = "SELECT " + string.Join(",", selectParts);
@@ -441,8 +482,14 @@ namespace DatEditorVDGrid
             // [Validate]
             sb.AppendLine();
             sb.AppendLine("[Validate]");
-            sb.AppendLine($"ColsSqlValid=");
-            sb.AppendLine($"ColsToAsignValues=");
+
+            // Write ColsSqlValid across numbered keys if needed (use 3 slots to match production examples)
+            string colsSqlValidJoined = (colsSqlValidTokens.Count > 0) ? string.Join("~", colsSqlValidTokens) : "";
+            DatWriterHelper.WriteNumberedKeys(sb, "ColsSqlValid", colsSqlValidJoined, 3);
+
+            // Write ColsToAsignValues across numbered keys (use 2 slots)
+            string colsToAsignJoined = (colsToAsignTokens.Count > 0) ? string.Join("~", colsToAsignTokens) : "";
+            DatWriterHelper.WriteNumberedKeys(sb, "ColsToAsignValues", colsToAsignJoined, 2);
 
             // show generated .dat inside richSalida only
             richSalida.Text = sb.ToString();
@@ -640,6 +687,17 @@ namespace DatEditorVDGrid
             if (!string.IsNullOrEmpty(_globalEllipsisColsToShow))
                 ellipsisColsToShowGlobalCsvTokens = _globalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
 
+            // NEW: load Validate properties
+            var fullColsSqlValid = data.ContainsKey("ColsSqlValid") ? DatService.GetFullProperty(data, "ColsSqlValid") : "";
+            var colsSqlValidTokens = string.IsNullOrEmpty(fullColsSqlValid)
+                ? new string[0]
+                : fullColsSqlValid.Split(new[] { '~' }, StringSplitOptions.None);
+
+            var fullColsToAsignValues = data.ContainsKey("ColsToAsignValues") ? DatService.GetFullProperty(data, "ColsToAsignValues") : "";
+            var colsToAsignValuesTokens = string.IsNullOrEmpty(fullColsToAsignValues)
+                ? new string[0]
+                : fullColsToAsignValues.Split(new[] { '~' }, StringSplitOptions.None);
+
             for (int i = 0; i < campos.Count; i++)
             {
                 var parts = campos[i].Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -728,6 +786,17 @@ namespace DatEditorVDGrid
                 else
                     dgvColumns.Rows[rowIndex].Cells["EllipsisColsToAlias"].Value = "";
 
+                // Assign Validate tokens if present
+                var tokSql = i < colsSqlValidTokens.Length ? colsSqlValidTokens[i] : "";
+                var tokAsign = i < colsToAsignValuesTokens.Length ? colsToAsignValuesTokens[i] : "";
+
+                dgvColumns.Rows[rowIndex].Cells["ColsSqlValidToken"].Value = tokSql;
+                dgvColumns.Rows[rowIndex].Cells["ColsToAsignValuesToken"].Value = tokAsign;
+
+                // Mark Validate checkbox if either token is non-empty and not "0"
+                bool shouldValidate = (!(string.IsNullOrEmpty(tokSql) || tokSql == "0") || !(string.IsNullOrEmpty(tokAsign) || tokAsign == "0"));
+                dgvColumns.Rows[rowIndex].Cells["Validate"].Value = shouldValidate;
+
                 // If this column name (alias or campo) is listed in ColsToEdit => mark Editable
                 bool shouldEdit = colsToEditTokens.Any(token =>
                     string.Equals(token, alias, StringComparison.OrdinalIgnoreCase) ||
@@ -760,6 +829,11 @@ namespace DatEditorVDGrid
                 ref _suppressRichSelectTextChanged,
                 true
             );
+        }
+
+        private void dgvColumns_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+
         }
     }//Form
 }//namespace
