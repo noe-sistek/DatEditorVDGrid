@@ -116,7 +116,7 @@ namespace DatEditorVDGrid
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 400F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 40F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 250F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(1160, 880);
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(1228, 880);
             this.tableLayoutPanel1.TabIndex = 5;
             // 
             // dgvColumns
@@ -134,7 +134,7 @@ namespace DatEditorVDGrid
             this.dgvColumns.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dgvColumns.Location = new System.Drawing.Point(3, 153);
             this.dgvColumns.Name = "dgvColumns";
-            this.dgvColumns.Size = new System.Drawing.Size(1154, 394);
+            this.dgvColumns.Size = new System.Drawing.Size(1222, 394);
             this.dgvColumns.TabIndex = 0;
             this.dgvColumns.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgvColumns_CellContentClick);
             // 
@@ -186,13 +186,13 @@ namespace DatEditorVDGrid
             this.panel2.Controls.Add(this.txtWhereSql);
             this.panel2.Location = new System.Drawing.Point(3, 3);
             this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(1003, 144);
+            this.panel2.Size = new System.Drawing.Size(1111, 144);
             this.panel2.TabIndex = 6;
             // 
             // richSelect
             // 
             this.richSelect.BackColor = System.Drawing.SystemColors.ControlLight;
-            this.richSelect.Location = new System.Drawing.Point(383, 28);
+            this.richSelect.Location = new System.Drawing.Point(556, 28);
             this.richSelect.Name = "richSelect";
             this.richSelect.Size = new System.Drawing.Size(552, 112);
             this.richSelect.TabIndex = 24;
@@ -259,7 +259,7 @@ namespace DatEditorVDGrid
             // lblFromJoins
             // 
             this.lblFromJoins.AutoSize = true;
-            this.lblFromJoins.Location = new System.Drawing.Point(380, 8);
+            this.lblFromJoins.Location = new System.Drawing.Point(553, 8);
             this.lblFromJoins.Name = "lblFromJoins";
             this.lblFromJoins.Size = new System.Drawing.Size(78, 13);
             this.lblFromJoins.TabIndex = 15;
@@ -295,7 +295,7 @@ namespace DatEditorVDGrid
             // 
             this.txtForeignKey.Location = new System.Drawing.Point(272, 28);
             this.txtForeignKey.Name = "txtForeignKey";
-            this.txtForeignKey.Size = new System.Drawing.Size(100, 20);
+            this.txtForeignKey.Size = new System.Drawing.Size(250, 20);
             this.txtForeignKey.TabIndex = 9;
             // 
             // lblForeignKey
@@ -317,7 +317,7 @@ namespace DatEditorVDGrid
             // lblKeyField
             // 
             this.lblKeyField.AutoSize = true;
-            this.lblKeyField.Location = new System.Drawing.Point(38, 121);
+            this.lblKeyField.Location = new System.Drawing.Point(38, 123);
             this.lblKeyField.Name = "lblKeyField";
             this.lblKeyField.Size = new System.Drawing.Size(47, 13);
             this.lblKeyField.TabIndex = 6;
@@ -334,7 +334,7 @@ namespace DatEditorVDGrid
             // 
             // txtKeyField
             // 
-            this.txtKeyField.Location = new System.Drawing.Point(86, 118);
+            this.txtKeyField.Location = new System.Drawing.Point(86, 120);
             this.txtKeyField.Name = "txtKeyField";
             this.txtKeyField.Size = new System.Drawing.Size(100, 20);
             this.txtKeyField.TabIndex = 4;
@@ -368,7 +368,7 @@ namespace DatEditorVDGrid
             // 
             this.txtWhereSql.Location = new System.Drawing.Point(86, 5);
             this.txtWhereSql.Name = "txtWhereSql";
-            this.txtWhereSql.Size = new System.Drawing.Size(288, 20);
+            this.txtWhereSql.Size = new System.Drawing.Size(436, 20);
             this.txtWhereSql.TabIndex = 0;
             // 
             // richSalida
@@ -379,7 +379,7 @@ namespace DatEditorVDGrid
             this.richSalida.ForeColor = System.Drawing.SystemColors.Control;
             this.richSalida.Location = new System.Drawing.Point(3, 593);
             this.richSalida.Name = "richSalida";
-            this.richSalida.Size = new System.Drawing.Size(1154, 284);
+            this.richSalida.Size = new System.Drawing.Size(1222, 284);
             this.richSalida.TabIndex = 7;
             this.richSalida.Text = "";
             // 
@@ -397,7 +397,7 @@ namespace DatEditorVDGrid
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1160, 880);
+            this.ClientSize = new System.Drawing.Size(1228, 880);
             this.Controls.Add(this.tableLayoutPanel1);
             this.Name = "Form1";
             this.Text = "Form1";

@@ -29,6 +29,7 @@ namespace DatEditorVDGrid
         private readonly Dictionary<string, string> _formattingProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _maskedProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _ellipsisExtraProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _subTotalsProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Syntax/coloring settings for SQL keywords and output separators
         private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
@@ -165,6 +166,13 @@ namespace DatEditorVDGrid
                 HeaderText = "InsNewRowAfter"
             });
 
+            // SubTotals: per-row checkbox to mark fields to be included as global totals
+            dgvColumns.Columns.Add(new DataGridViewCheckBoxColumn()
+            {
+                Name = "SubTotal",
+                HeaderText = "SubTotal"
+            });
+
             // Ensure edits commit immediately for checkbox handling
             dgvColumns.CurrentCellDirtyStateChanged += (s, ev) =>
             {
@@ -251,6 +259,10 @@ namespace DatEditorVDGrid
             // Behavior InsNewRowAfter selection
             var insNewRowSelected = new List<string>();
 
+            // SubTotals: track marked names for summary generation
+            var markedSubTotalNames = new List<string>();
+            int markedSubTotalCount = 0;
+
             foreach (var row in filas)
             {
                 string campo = row.Cells["CampoSQL"].Value?.ToString();
@@ -287,6 +299,19 @@ namespace DatEditorVDGrid
                     var fieldName = !string.IsNullOrWhiteSpace(alias) ? alias : StripTablePrefix(campo);
                     if (!string.IsNullOrEmpty(fieldName))
                         insNewRowSelected.Add(fieldName);
+                }
+
+                // SubTotal checkbox
+                bool isSubTotal = Convert.ToBoolean(row.Cells["SubTotal"].Value ?? false);
+                if (isSubTotal)
+                {
+                    // prefer alias, otherwise stripped campo
+                    var name = !string.IsNullOrWhiteSpace(alias) ? alias : StripTablePrefix(campo);
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        markedSubTotalNames.Add(name);
+                        markedSubTotalCount++;
+                    }
                 }
 
                 // select parts
@@ -438,18 +463,6 @@ namespace DatEditorVDGrid
             sb.AppendLine($"EllipsisColsToAlias={ellipsisColsToAliasJoined}");
 
             // Now emit the remaining ellipsis extra properties (preserve or generate appropriate zeros)
-            // Keys and their separators based on production examples:
-            // - EllipsisColInvokeColor -> comma
-            // - EllipsisColInvokeFont -> comma
-            // - EllipsisColsNewFields -> ~
-            // - EllipsisColsNewCaption -> ~
-            // - EllipsisColsNewDataTypes -> ~
-            // - EllipsisColsNewTableNames -> comma
-            // - EllipsisColInvokeOpen -> comma
-            // - EllipsisColOpenFilters -> ~
-            // - EllipsisColInvokeBrowse -> comma
-            // - EllipsisColShellExec -> comma
-
             sb.AppendLine($"EllipsisColInvokeColor={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeColor", ',', fieldCount)}");
             sb.AppendLine($"EllipsisColInvokeFont={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeFont", ',', fieldCount)}");
             sb.AppendLine($"EllipsisColsNewFields={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewFields", '~', fieldCount)}");
@@ -460,18 +473,6 @@ namespace DatEditorVDGrid
             sb.AppendLine($"EllipsisColOpenFilters={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColOpenFilters", '~', fieldCount)}");
             sb.AppendLine($"EllipsisColInvokeBrowse={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeBrowse", ',', fieldCount)}");
             sb.AppendLine($"EllipsisColShellExec={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColShellExec", ',', fieldCount)}");
-
-            // Additional Ellipsis display/invoke keys (other keys kept empty for now if not preserved)
-            //sb.AppendLine($"EllipsisColInvokeColor2=");
-            //sb.AppendLine($"EllipsisColInvokeFont2=");
-            //sb.AppendLine($"EllipsisColsNewFields2=");
-            //sb.AppendLine($"EllipsisColsNewCaption2=");
-            //sb.AppendLine($"EllipsisColsNewDataTypes2=");
-            //sb.AppendLine($"EllipsisColsNewTableNames2=");
-            //sb.AppendLine($"EllipsisColInvokeOpen2=");
-            //sb.AppendLine($"EllipsisColOpenFilters2=");
-            //sb.AppendLine($"EllipsisColInvokeBrowse2=");
-            //sb.AppendLine($"EllipsisColShellExec2=");
 
             // [Formatting]
             sb.AppendLine();
@@ -526,14 +527,53 @@ namespace DatEditorVDGrid
             // [SubTotals]
             sb.AppendLine();
             sb.AppendLine("[SubTotals]");
-            sb.AppendLine($"Totales=");
-            sb.AppendLine($"MultipleSubTotals=");
-            sb.AppendLine($"SubTotalsGroups=");
-            sb.AppendLine($"SubTotalsSummary=");
-            sb.AppendLine($"SubTotalBkColors=");
-            sb.AppendLine($"SubTotalCaptions=");
-            sb.AppendLine($"SubTotalsEditable=");
-            sb.AppendLine($"DetailEditable=");
+
+            // Totales = 1 if any SubTotal checkbox selected, otherwise 0 (but always emit)
+            string totalesVal = (markedSubTotalCount > 0) ? "1" : "0";
+            sb.AppendLine($"Totales={totalesVal}");
+
+            // Preserve MultipleSubTotals if imported, otherwise emit preserved or blank
+            string multipleSubTotalsVal = _subTotalsProps.ContainsKey("MultipleSubTotals") ? _subTotalsProps["MultipleSubTotals"] : "";
+            sb.AppendLine($"MultipleSubTotals={multipleSubTotalsVal}");
+
+            // SubTotalsGroups: always emit a comma-separated list sized to fieldCount.
+            string subTotalsGroupsOut;
+            if (markedSubTotalCount > 0)
+            {
+                // first positions = 1 (count = markedSubTotalCount), rest zeros
+                subTotalsGroupsOut = string.Join(",", Enumerable.Repeat("1", markedSubTotalCount).Concat(Enumerable.Repeat("0", Math.Max(0, fieldCount - markedSubTotalCount))));
+            }
+            else
+            {
+                // preserve original if present, otherwise zeros
+                subTotalsGroupsOut = _subTotalsProps.ContainsKey("SubTotalsGroups") ? _subTotalsProps["SubTotalsGroups"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
+            }
+            sb.AppendLine($"SubTotalsGroups={subTotalsGroupsOut}");
+
+            // SubTotalsSummary: if user selected marked fields, place their names as first chunk then pad with ~0
+            string subTotalsSummaryOut;
+            if (markedSubTotalCount > 0)
+            {
+                var first = markedSubTotalNames.Count > 0 ? string.Join(",", markedSubTotalNames) : "0";
+                // create fieldCount tokens total: first token is the comma-list, remaining tokens are "0"
+                subTotalsSummaryOut = first + string.Concat(Enumerable.Repeat("~0", Math.Max(0, fieldCount - 1)));
+            }
+            else
+            {
+                subTotalsSummaryOut = _subTotalsProps.ContainsKey("SubTotalsSummary") ? _subTotalsProps["SubTotalsSummary"] : string.Join("~", Enumerable.Repeat("0", fieldCount));
+            }
+            sb.AppendLine($"SubTotalsSummary={subTotalsSummaryOut}");
+
+            // SubTotalBkColors and SubTotalCaptions: preserve or emit comma zeros of length fieldCount
+            string bkcolorsOut = _subTotalsProps.ContainsKey("SubTotalBkColors") ? _subTotalsProps["SubTotalBkColors"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
+            sb.AppendLine($"SubTotalBkColors={bkcolorsOut}");
+
+            string captionsOut = _subTotalsProps.ContainsKey("SubTotalCaptions") ? _subTotalsProps["SubTotalCaptions"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
+            sb.AppendLine($"SubTotalCaptions={captionsOut}");
+
+            // SubTotalsEditable, DetailEditable preserve
+            sb.AppendLine($"SubTotalsEditable={(_subTotalsProps.ContainsKey("SubTotalsEditable") ? _subTotalsProps["SubTotalsEditable"] : "")}");
+            sb.AppendLine($"DetailEditable={(_subTotalsProps.ContainsKey("DetailEditable") ? _subTotalsProps["DetailEditable"] : "")}");
 
             // [Behavior]
             sb.AppendLine();
@@ -644,6 +684,7 @@ namespace DatEditorVDGrid
             _formattingProps.Clear();
             _maskedProps.Clear();
             _ellipsisExtraProps.Clear();
+            _subTotalsProps.Clear();
 
             var fullSource = DatService.GetFullProperty(data, "SourceSql");
 
@@ -768,6 +809,24 @@ namespace DatEditorVDGrid
                     _ellipsisExtraProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
+            // Preserve SubTotals keys
+            string[] subTotalsKeys = new[]
+            {
+                "Totales",
+                "MultipleSubTotals",
+                "SubTotalsGroups",
+                "SubTotalsSummary",
+                "SubTotalBkColors",
+                "SubTotalCaptions",
+                "SubTotalsEditable",
+                "DetailEditable"
+            };
+            foreach (var k in subTotalsKeys)
+            {
+                if (data.ContainsKey(k))
+                    _subTotalsProps[k] = DatService.GetFullProperty(data, k) ?? "";
+            }
+
             // From+Joins se muestra en richSelect (control independiente)
             try
             {
@@ -883,6 +942,12 @@ namespace DatEditorVDGrid
                 ? new string[0]
                 : fullInsNewRowAfter.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToArray();
 
+            // NEW: load SubTotalsGroups tokens to mark per-row SubTotal checkbox
+            var fullSubTotalsGroups = _subTotalsProps.ContainsKey("SubTotalsGroups") ? _subTotalsProps["SubTotalsGroups"] : "";
+            var subTotalsGroupsTokens = string.IsNullOrEmpty(fullSubTotalsGroups)
+                ? new string[0]
+                : fullSubTotalsGroups.Split(new[] { ',' }, StringSplitOptions.None);
+
             for (int i = 0; i < campos.Count; i++)
             {
                 var parts = campos[i].Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -988,6 +1053,10 @@ namespace DatEditorVDGrid
                     string.Equals(t, StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
                 dgvColumns.Rows[rowIndex].Cells["InsNewRowAfter"].Value = insMark;
 
+                // Mark SubTotal checkbox based on SubTotalsGroups token (imported mapping)
+                bool subTotalMark = (i < subTotalsGroupsTokens.Length && subTotalsGroupsTokens[i].Trim() == "1");
+                dgvColumns.Rows[rowIndex].Cells["SubTotal"].Value = subTotalMark;
+
                 // If this column name (alias or campo without table prefix) is listed in ColsToEdit => mark Editable
                 bool shouldEdit = colsToEditTokens.Any(token =>
                     string.Equals(token, alias, StringComparison.OrdinalIgnoreCase) ||
@@ -1030,16 +1099,16 @@ namespace DatEditorVDGrid
             // Columns to ensure default "0" values for ellipsis-related fields (per-row)
             var ellipsisCols = new[]
             {
-        "EllipsisSqlSources",
-        "EllipsisColsWidths",
-        "EllipsisColsHeaders",
-        "EllipsisColsToShowfrmSearch",
-        "EllipsisColsToAsign",
-        "EllipsisColsToAlias",
-        // validate tokens
-        "ColsSqlValidToken",
-        "ColsToAsignValuesToken"
-    };
+                "EllipsisSqlSources",
+                "EllipsisColsWidths",
+                "EllipsisColsHeaders",
+                "EllipsisColsToShowfrmSearch",
+                "EllipsisColsToAsign",
+                "EllipsisColsToAlias",
+                // validate tokens
+                "ColsSqlValidToken",
+                "ColsToAsignValuesToken"
+            };
 
             int filled = 0;
 
