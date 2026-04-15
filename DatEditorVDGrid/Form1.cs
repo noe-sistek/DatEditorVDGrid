@@ -24,8 +24,9 @@ namespace DatEditorVDGrid
         private string _fullEllipsisColsToAsign = "";
         private string _fullEllipsisColsToAlias = "";
 
-        // Preserve behavior properties loaded from the .dat so we can re-emit them unchanged
+        // Preserve behavior and formatting properties loaded from the .dat so we can re-emit them unchanged
         private readonly Dictionary<string, string> _behaviorProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _formattingProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Syntax/coloring settings for SQL keywords and output separators
         private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
@@ -163,12 +164,10 @@ namespace DatEditorVDGrid
             });
 
             // Ensure edits commit immediately for checkbox handling
-            //dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
             dgvColumns.CurrentCellDirtyStateChanged += (s, ev) =>
             {
                 DataGridHelper.CommitEdit(dgvColumns);
             };
-            //dgvColumns.CellValueChanged += dgvColumns_CellValueChanged;
             dgvColumns.CellValueChanged += (s, ev) =>
             {
                 if (ev.RowIndex < 0 || ev.ColumnIndex < 0)
@@ -392,7 +391,6 @@ namespace DatEditorVDGrid
             // EllipsisSqlSources..3 (always present up to 6 keys)
             // Use per-row ellipsisSqlSources joined by '~' OR per-row tokens; prefer per-row tokens processed above
             string ellipsisSqlSourcesJoined = (ellipsisSqlSources.Count > 0) ? string.Join("~", ellipsisSqlSources) : "";
-            // If none per-row but there may be a global _globalEllipsisColsToShow we won't use it here.
             DatWriterHelper.WriteNumberedKeys(sb, "EllipsisSqlSources", ellipsisSqlSourcesJoined, 2);
 
             // EllipsisColsWidths (single key with possible ~-joined tokens)
@@ -442,10 +440,14 @@ namespace DatEditorVDGrid
 
             // Widths, Height, ResizeCols, ResizeRows, MoveCols, Editable, ColsToEdit, FormatStrings, etc.
             sb.AppendLine($"Widths={string.Join(",", widths)}");
-            sb.AppendLine($"Height=");
-            sb.AppendLine($"ResizeCols=");
-            sb.AppendLine($"ResizeRows=");
-            sb.AppendLine($"MoveCols=");
+
+            // Emit preserved formatting keys when available, otherwise blank (these are single-line keys not per-column)
+            sb.AppendLine($"Height={(_formattingProps.ContainsKey("Height") ? _formattingProps["Height"] : "")}");
+            sb.AppendLine($"ResizeCols={(_formattingProps.ContainsKey("ResizeCols") ? _formattingProps["ResizeCols"] : "")}");
+            sb.AppendLine($"ResizeRows={(_formattingProps.ContainsKey("ResizeRows") ? _formattingProps["ResizeRows"] : "")}");
+            sb.AppendLine($"MoveCols={(_formattingProps.ContainsKey("MoveCols") ? _formattingProps["MoveCols"] : "")}");
+
+            // Keep UI-driven Editable (chkEditable) — this is already set on load from the .dat
             sb.AppendLine($"Editable={(chkEditable.Checked ? "1" : "0")}");
 
             // Build ColsToEdit: use Alias when present, otherwise CampoSQL stripped of table prefix; ignore empty values
@@ -467,16 +469,16 @@ namespace DatEditorVDGrid
             // FormatStrings (use ~ for per-row format strings)
             sb.AppendLine($"FormatStrings={string.Join("~", formats)}");
 
-            // More formatting flags
-            sb.AppendLine($"ExplorerBar=");
-            sb.AppendLine($"AutoSearch=");
-            sb.AppendLine($"SelectFullRow=");
-            sb.AppendLine($"MergeCells=");
-            sb.AppendLine($"OutlineBar=");
-            sb.AppendLine($"BlankLinesOnEdit=");
-            sb.AppendLine($"FrozenRows=");
-            sb.AppendLine($"FrozenCols=");
-            sb.AppendLine($"WordWrap=");
+            // Emit rest of formatting flags from preserved values
+            sb.AppendLine($"ExplorerBar={(_formattingProps.ContainsKey("ExplorerBar") ? _formattingProps["ExplorerBar"] : "")}");
+            sb.AppendLine($"AutoSearch={(_formattingProps.ContainsKey("AutoSearch") ? _formattingProps["AutoSearch"] : "")}");
+            sb.AppendLine($"SelectFullRow={(_formattingProps.ContainsKey("SelectFullRow") ? _formattingProps["SelectFullRow"] : "")}");
+            sb.AppendLine($"MergeCells={(_formattingProps.ContainsKey("MergeCells") ? _formattingProps["MergeCells"] : "")}");
+            sb.AppendLine($"OutlineBar={(_formattingProps.ContainsKey("OutlineBar") ? _formattingProps["OutlineBar"] : "")}");
+            sb.AppendLine($"BlankLinesOnEdit={(_formattingProps.ContainsKey("BlankLinesOnEdit") ? _formattingProps["BlankLinesOnEdit"] : "")}");
+            sb.AppendLine($"FrozenRows={(_formattingProps.ContainsKey("FrozenRows") ? _formattingProps["FrozenRows"] : "")}");
+            sb.AppendLine($"FrozenCols={(_formattingProps.ContainsKey("FrozenCols") ? _formattingProps["FrozenCols"] : "")}");
+            sb.AppendLine($"WordWrap={(_formattingProps.ContainsKey("WordWrap") ? _formattingProps["WordWrap"] : "")}");
 
             // [SubTotals]
             sb.AppendLine();
@@ -581,7 +583,6 @@ namespace DatEditorVDGrid
             if (ofd.ShowDialog() != DialogResult.OK)
                 return;
 
-            //var data = ParseDatFile(ofd.FileName);
             var data = DatService.ParseDatFile(ofd.FileName);
 
             dgvColumns.Rows.Clear();
@@ -592,13 +593,13 @@ namespace DatEditorVDGrid
                 return;
             }
 
-            // reset global ellipsis-per-popup holder
+            // reset holders
             _globalEllipsisColsToShow = "";
             _fullEllipsisColsToAsign = "";
             _fullEllipsisColsToAlias = "";
             _behaviorProps.Clear();
+            _formattingProps.Clear();
 
-            //var fullSource = DatService.GetFullProperty(data, "SourceSql");
             var fullSource = DatService.GetFullProperty(data, "SourceSql");
 
             // separar SELECT vs FROM+JOINS
@@ -665,6 +666,29 @@ namespace DatEditorVDGrid
             {
                 if (data.ContainsKey(k))
                     _behaviorProps[k] = DatService.GetFullProperty(data, k) ?? "";
+            }
+
+            // Preserve Formatting keys that are NOT per-column (we already handle Headers/Widths/ColsToEdit/FormatStrings from grid)
+            string[] formattingKeysToPreserve = new[]
+            {
+                "Height",
+                "ResizeCols",
+                "ResizeRows",
+                "MoveCols",
+                "ExplorerBar",
+                "AutoSearch",
+                "SelectFullRow",
+                "MergeCells",
+                "OutlineBar",
+                "BlankLinesOnEdit",
+                "FrozenRows",
+                "FrozenCols",
+                "WordWrap"
+            };
+            foreach (var k in formattingKeysToPreserve)
+            {
+                if (data.ContainsKey(k))
+                    _formattingProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
             // From+Joins se muestra en richSelect (control independiente)
