@@ -1,4 +1,7 @@
-﻿using System;
+﻿using DatEditorVDGrid.Helpers;
+using DatEditorVDGrid.Services;
+using DatEditorVDGrid.UIHelpers;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -129,12 +132,26 @@ namespace DatEditorVDGrid
 
 
             // Ensure edits commit immediately for checkbox handling
-            dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
-            dgvColumns.CellValueChanged += dgvColumns_CellValueChanged;
+            //dgvColumns.CurrentCellDirtyStateChanged += dgvColumns_CurrentCellDirtyStateChanged;
+            dgvColumns.CurrentCellDirtyStateChanged += (s, ev) =>
+            {
+                DataGridHelper.CommitEdit(dgvColumns);
+            };
+            //dgvColumns.CellValueChanged += dgvColumns_CellValueChanged;
+            dgvColumns.CellValueChanged += (s, ev) =>
+            {
+                if (ev.RowIndex < 0 || ev.ColumnIndex < 0)
+                    return;
+
+                var colName = dgvColumns.Columns[ev.ColumnIndex].Name;
+
+                if (colName == "Ellipsis")
+                {
+                    DataGridHelper.HandleEllipsisChange(dgvColumns, ev.RowIndex);
+                }
+            };
         }
 
-        private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
-        { }
 
         private void btnAddRow_Click(object sender, EventArgs e)
         {
@@ -213,12 +230,12 @@ namespace DatEditorVDGrid
             }
 
             // Trim trailing empty tokens for per-row lists (only for things using ~ separators)
-            TrimTrailingEmpty(ellipsisSqlSources);
-            TrimTrailingEmpty(ellipsisColsWidths);
-            TrimTrailingEmpty(ellipsisColsHeaders);
-            TrimTrailingEmpty(ellipsisColsToShow);
-            TrimTrailingEmpty(ellipsisColsToAsign);
-            TrimTrailingEmpty(ellipsisColsToAlias);
+            DatWriterHelper.TrimTrailingEmpty(ellipsisSqlSources);
+            DatWriterHelper.TrimTrailingEmpty(ellipsisColsWidths);
+            DatWriterHelper.TrimTrailingEmpty(ellipsisColsHeaders);
+            DatWriterHelper.TrimTrailingEmpty(ellipsisColsToShow);
+            DatWriterHelper.TrimTrailingEmpty(ellipsisColsToAsign);
+            DatWriterHelper.TrimTrailingEmpty(ellipsisColsToAlias);
 
             // construir SELECT respetando que los campos no contengan coma adicional
             string selectClause = "SELECT " + string.Join(",", selectParts);
@@ -233,7 +250,7 @@ namespace DatEditorVDGrid
             sb.AppendLine("[Source]");
 
             // SourceSql..SourceSql7 (always present, empty if not set)
-            WriteNumberedKeys(sb, "SourceSql", fullSql, 2);
+            DatWriterHelper.WriteNumberedKeys(sb, "SourceSql", fullSql, 2);
 
             // Procedure (leave blank if not configured)
             string procedureVal = chkProcedure.Checked ? "1" : "";
@@ -265,7 +282,7 @@ namespace DatEditorVDGrid
             string foreignAliasStr = txtForeignAlias.Text?.Trim() ?? "";
             if (string.IsNullOrEmpty(foreignAliasStr) && !string.IsNullOrEmpty(foreignKeyStr))
             {
-                string inferredAlias = ExtractMainTableAliasFromFromPart(fromJoins);
+                string inferredAlias = SqlParserService.ExtractMainTableAliasFromFromPart(fromJoins);
                 var fkTokens = foreignKeyStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(s => s.Trim())
                     .ToArray();
@@ -302,7 +319,7 @@ namespace DatEditorVDGrid
             // Use per-row ellipsisSqlSources joined by '~' OR per-row tokens; prefer per-row tokens processed above
             string ellipsisSqlSourcesJoined = (ellipsisSqlSources.Count > 0) ? string.Join("~", ellipsisSqlSources) : "";
             // If none per-row but there may be a global _globalEllipsisColsToShow we won't use it here.
-            WriteNumberedKeys(sb, "EllipsisSqlSources", ellipsisSqlSourcesJoined, 2);
+            DatWriterHelper.WriteNumberedKeys(sb, "EllipsisSqlSources", ellipsisSqlSourcesJoined, 2);
 
             // EllipsisColsWidths (single key with possible ~-joined tokens)
             string ellipsisColsWidthsJoined = (ellipsisColsWidths.Count > 0) ? string.Join("~", ellipsisColsWidths) : "";
@@ -311,7 +328,7 @@ namespace DatEditorVDGrid
             // EllipsisColsHeaders and additional two numbered header keys (Headers, Headers2, Headers3)
             // We'll join per-row values with '~' and then distribute across the available header keys if needed.
             string ellipsisColsHeadersJoined = (ellipsisColsHeaders.Count > 0) ? string.Join("~", ellipsisColsHeaders) : "";
-            WriteNumberedKeys(sb, "EllipsisColsHeaders", ellipsisColsHeadersJoined, 2);
+            DatWriterHelper.WriteNumberedKeys(sb, "EllipsisColsHeaders", ellipsisColsHeadersJoined, 2);
 
             // EllipsisColsToShowfrmSearch (single key)
             string ellipsisColsToShowJoined = "";
@@ -323,7 +340,7 @@ namespace DatEditorVDGrid
 
             // EllipsisColsToAsign (three keys)
             string ellipsisColsToAsignJoined = (ellipsisColsToAsign.Count > 0) ? string.Join("~", ellipsisColsToAsign) : _fullEllipsisColsToAsign ?? "";
-            WriteNumberedKeys(sb, "EllipsisColsToAsign", ellipsisColsToAsignJoined, 2);
+            DatWriterHelper.WriteNumberedKeys(sb, "EllipsisColsToAsign", ellipsisColsToAsignJoined, 2);
 
             // EllipsisColsToAlias (single key)
             string ellipsisColsToAliasJoined = (ellipsisColsToAlias.Count > 0) ? string.Join("~", ellipsisColsToAlias) : _fullEllipsisColsToAlias ?? "";
@@ -347,7 +364,7 @@ namespace DatEditorVDGrid
 
             // Headers (up to 4 keys)
             string headersJoined = (headers.Count > 0) ? string.Join(",", headers.Where(h => !string.IsNullOrWhiteSpace(h))) : "";
-            WriteNumberedKeys(sb, "Headers", headersJoined, 2);
+            DatWriterHelper.WriteNumberedKeys(sb, "Headers", headersJoined, 2);
 
             // Widths, Height, ResizeCols, ResizeRows, MoveCols, Editable, ColsToEdit, FormatStrings, etc.
             sb.AppendLine($"Widths={string.Join(",", widths)}");
@@ -431,7 +448,11 @@ namespace DatEditorVDGrid
             richSalida.Text = sb.ToString();
 
             // Only color separator characters (commas and tildes). Do not change background/overall forecolor here.
-            HighlightSeparators(richSalida, new[] { ',', '~' }, _separatorColor);
+            RichTextHelper.HighlightSeparators(
+                richSalida,
+                new[] { ',', '~' },
+                _separatorColor
+            );
         }
 
         private void btnValidate_Click(object sender, EventArgs e)
@@ -456,34 +477,6 @@ namespace DatEditorVDGrid
                 MessageBox.Show(string.Join("\n", errores), "Errores", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
-        private Dictionary<string, string> ParseDatFile(string path)
-        {
-            var dict = new Dictionary<string, string>();
-            var lines = System.IO.File.ReadAllLines(path);
-
-            string currentSection = "";
-
-            foreach (var line in lines)
-            {
-                if (line.StartsWith("["))
-                {
-                    currentSection = line.Trim();
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(line) || !line.Contains("="))
-                    continue;
-
-                var parts = line.Split(new[] { '=' }, 2);
-                string key = parts[0].Trim();
-                string value = parts[1].Trim();
-
-                dict[key] = value;
-            }
-
-            return dict;
-        }
-
         private void btnLoadDat_Click(object sender, EventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog();
@@ -492,7 +485,8 @@ namespace DatEditorVDGrid
             if (ofd.ShowDialog() != DialogResult.OK)
                 return;
 
-            var data = ParseDatFile(ofd.FileName);
+            //var data = ParseDatFile(ofd.FileName);
+            var data = DatService.ParseDatFile(ofd.FileName);
 
             dgvColumns.Rows.Clear();
 
@@ -507,45 +501,46 @@ namespace DatEditorVDGrid
             _fullEllipsisColsToAsign = "";
             _fullEllipsisColsToAlias = "";
 
-            var fullSource = GetFullProperty(data, "SourceSql");
+            //var fullSource = DatService.GetFullProperty(data, "SourceSql");
+            var fullSource = DatService.GetFullProperty(data, "SourceSql");
 
             // separar SELECT vs FROM+JOINS
-            SplitSelectFrom(fullSource, out string selectOnly, out string fromPart);
+            SqlParserService.SplitSelectFrom(fullSource, out string selectOnly, out string fromPart);
 
             // si el .dat trae TabletoSave o TableToSave, preferirla; si no, extraer la tabla principal desde FROM
             string tableVal = "";
             if (data.ContainsKey("TabletoSave"))
-                tableVal = GetFullProperty(data, "TabletoSave");
+                tableVal = DatService.GetFullProperty(data, "TabletoSave");
             else if (data.ContainsKey("TableToSave"))
-                tableVal = GetFullProperty(data, "TableToSave");
+                tableVal = DatService.GetFullProperty(data, "TableToSave");
 
             if (!string.IsNullOrWhiteSpace(tableVal))
                 txtTableToSave.Text = tableVal;
             else
-                txtTableToSave.Text = ExtractMainTableFromFromPart(fromPart);
+                txtTableToSave.Text = SqlParserService.ExtractMainTableFromFromPart(fromPart);
 
             // completar controles de configuración desde .dat
-            txtWhereSql.Text = data.ContainsKey("WhereSql") ? GetFullProperty(data, "WhereSql") : "";
-            txtOrderSql.Text = data.ContainsKey("OrderSql") ? GetFullProperty(data, "OrderSql") : "";
+            txtWhereSql.Text = data.ContainsKey("WhereSql") ? DatService.GetFullProperty(data, "WhereSql") : "";
+            txtOrderSql.Text = data.ContainsKey("OrderSql") ? DatService.GetFullProperty(data, "OrderSql") : "";
             // KeyField
-            txtKeyField.Text = data.ContainsKey("KeyField") ? GetFullProperty(data, "KeyField") : "";
+            txtKeyField.Text = data.ContainsKey("KeyField") ? DatService.GetFullProperty(data, "KeyField") : "";
             // ForeignKey / ForeignToSave
-            txtForeignKey.Text = data.ContainsKey("ForeignKey") ? GetFullProperty(data, "ForeignKey") : "";
-            txtForeignSave.Text = data.ContainsKey("ForeignToSave") ? GetFullProperty(data, "ForeignToSave") : "";
+            txtForeignKey.Text = data.ContainsKey("ForeignKey") ? DatService.GetFullProperty(data, "ForeignKey") : "";
+            txtForeignSave.Text = data.ContainsKey("ForeignToSave") ? DatService.GetFullProperty(data, "ForeignToSave") : "";
             // Procedure flag (if provided)
             if (data.ContainsKey("Procedure"))
-                chkProcedure.Checked = GetFullProperty(data, "Procedure").Trim() != "0";
+                chkProcedure.Checked = DatService.GetFullProperty(data, "Procedure").Trim() != "0";
             // SqlIdentityKey, CountableCol, ForeignAlias
-            txtSqlIdentityKey.Text = data.ContainsKey("SqlIdentityKey") ? GetFullProperty(data, "SqlIdentityKey") : "";
-            txtCountableCol.Text = data.ContainsKey("CountableCol") ? GetFullProperty(data, "CountableCol") : "";
-            txtForeignAlias.Text = data.ContainsKey("ForeignAlias") ? GetFullProperty(data, "ForeignAlias") : "";
-            chkEditable.Checked = data.ContainsKey("Editable") && GetFullProperty(data, "Editable").Trim() == "1";
+            txtSqlIdentityKey.Text = data.ContainsKey("SqlIdentityKey") ? DatService.GetFullProperty(data, "SqlIdentityKey") : "";
+            txtCountableCol.Text = data.ContainsKey("CountableCol") ? DatService.GetFullProperty(data, "CountableCol") : "";
+            txtForeignAlias.Text = data.ContainsKey("ForeignAlias") ? DatService.GetFullProperty(data, "ForeignAlias") : "";
+            chkEditable.Checked = data.ContainsKey("Editable") && DatService.GetFullProperty(data, "Editable").Trim() == "1";
 
             // NEW: load EllipsisColsToAsign / EllipsisColsToAlias full values for later re-output
             if (data.ContainsKey("EllipsisColsToAsign"))
-                _fullEllipsisColsToAsign = GetFullProperty(data, "EllipsisColsToAsign");
+                _fullEllipsisColsToAsign = DatService.GetFullProperty(data, "EllipsisColsToAsign");
             if (data.ContainsKey("EllipsisColsToAlias"))
-                _fullEllipsisColsToAlias = GetFullProperty(data, "EllipsisColsToAlias");
+                _fullEllipsisColsToAlias = DatService.GetFullProperty(data, "EllipsisColsToAlias");
 
             // From+Joins se muestra en richSelect (control independiente)
             try
@@ -553,7 +548,14 @@ namespace DatEditorVDGrid
                 _suppressRichSelectTextChanged = true;
                 richSelect.Text = fromPart?.Trim() ?? "";
                 // ensure reserved words appear uppercased + colored from the start
-                ApplySqlKeywordHighlight(richSelect, uppercaseKeywords: true);
+                RichTextHelper.ApplySqlKeywordHighlight(
+                    richSelect,
+                    _sqlKeywords,
+                    _joinColor,
+                    _keywordColor,
+                    ref _suppressRichSelectTextChanged,
+                    true
+                );
             }
             finally
             {
@@ -568,39 +570,39 @@ namespace DatEditorVDGrid
             }
             sourceBody = sourceBody.Trim();
 
-            var campos = SplitSqlColumns(sourceBody);
-            var dataTypes = data.ContainsKey("DataTypes") ? GetFullProperty(data, "DataTypes").Split(',') : new string[0];
-            var save = data.ContainsKey("FieldsToSave") ? GetFullProperty(data, "FieldsToSave").Split(',') : new string[0];
-            var req = data.ContainsKey("RequiredFields") ? GetFullProperty(data, "RequiredFields").Split(',') : new string[0];
-            var headers = data.ContainsKey("Headers") ? GetFullProperty(data, "Headers").Split(',') : new string[0];
-            var widths = data.ContainsKey("Widths") ? GetFullProperty(data, "Widths").Split(',') : new string[0];
-            var formats = data.ContainsKey("FormatStrings") ? GetFullProperty(data, "FormatStrings").Split('~') : new string[0];
-            var ellipsis = data.ContainsKey("EllipsisWhichOnes") ? GetFullProperty(data, "EllipsisWhichOnes").Split(',') : new string[0];
+            var campos = SqlParserService.SplitSqlColumns(sourceBody);
+            var dataTypes = data.ContainsKey("DataTypes") ? DatService.GetFullProperty(data, "DataTypes").Split(',') : new string[0];
+            var save = data.ContainsKey("FieldsToSave") ? DatService.GetFullProperty(data, "FieldsToSave").Split(',') : new string[0];
+            var req = data.ContainsKey("RequiredFields") ? DatService.GetFullProperty(data, "RequiredFields").Split(',') : new string[0];
+            var headers = data.ContainsKey("Headers") ? DatService.GetFullProperty(data, "Headers").Split(',') : new string[0];
+            var widths = data.ContainsKey("Widths") ? DatService.GetFullProperty(data, "Widths").Split(',') : new string[0];
+            var formats = data.ContainsKey("FormatStrings") ? DatService.GetFullProperty(data, "FormatStrings").Split('~') : new string[0];
+            var ellipsis = data.ContainsKey("EllipsisWhichOnes") ? DatService.GetFullProperty(data, "EllipsisWhichOnes").Split(',') : new string[0];
 
             // NEW: load EllipsisSqlSources and ColsToEdit combined properties and new ellipsis columns
-            var fullEllipsisSources = data.ContainsKey("EllipsisSqlSources") ? GetFullProperty(data, "EllipsisSqlSources") : "";
+            var fullEllipsisSources = data.ContainsKey("EllipsisSqlSources") ? DatService.GetFullProperty(data, "EllipsisSqlSources") : "";
             var ellipsisTokens = string.IsNullOrEmpty(fullEllipsisSources)
                 ? new string[0]
                 : fullEllipsisSources.Split(new[] { '~' }, StringSplitOptions.None);
 
-            var fullColsToEdit = data.ContainsKey("ColsToEdit") ? GetFullProperty(data, "ColsToEdit") : "";
+            var fullColsToEdit = data.ContainsKey("ColsToEdit") ? DatService.GetFullProperty(data, "ColsToEdit") : "";
             var colsToEditTokens = string.IsNullOrWhiteSpace(fullColsToEdit)
                 ? new string[0]
                 : fullColsToEdit.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(s => s.Trim())
                     .ToArray();
 
-            var fullEllipsisColsWidths = data.ContainsKey("EllipsisColsWidths") ? GetFullProperty(data, "EllipsisColsWidths") : "";
+            var fullEllipsisColsWidths = data.ContainsKey("EllipsisColsWidths") ? DatService.GetFullProperty(data, "EllipsisColsWidths") : "";
             var ellipsisColsWidthsTokens = string.IsNullOrEmpty(fullEllipsisColsWidths)
                 ? new string[0]
                 : fullEllipsisColsWidths.Split(new[] { '~' }, StringSplitOptions.None);
 
-            var fullEllipsisColsHeaders = data.ContainsKey("EllipsisColsHeaders") ? GetFullProperty(data, "EllipsisColsHeaders") : "";
+            var fullEllipsisColsHeaders = data.ContainsKey("EllipsisColsHeaders") ? DatService.GetFullProperty(data, "EllipsisColsHeaders") : "";
             var ellipsisColsHeadersTokens = string.IsNullOrEmpty(fullEllipsisColsHeaders)
                 ? new string[0]
                 : fullEllipsisColsHeaders.Split(new[] { '~' }, StringSplitOptions.None);
 
-            var fullEllipsisColsToShow = data.ContainsKey("EllipsisColsToShowfrmSearch") ? GetFullProperty(data, "EllipsisColsToShowfrmSearch") : "";
+            var fullEllipsisColsToShow = data.ContainsKey("EllipsisColsToShowfrmSearch") ? DatService.GetFullProperty(data, "EllipsisColsToShowfrmSearch") : "";
             var ellipsisColsToShowTokens = string.IsNullOrEmpty(fullEllipsisColsToShow)
                 ? new string[0]
                 : fullEllipsisColsToShow.Split(new[] { '~' }, StringSplitOptions.None);
@@ -617,12 +619,12 @@ namespace DatEditorVDGrid
             }
 
             // Load EllipsisColsToAsign / EllipsisColsToAlias tokens (full strings preserved already)
-            var fullEllipsisColsToAsign = data.ContainsKey("EllipsisColsToAsign") ? GetFullProperty(data, "EllipsisColsToAsign") : "";
+            var fullEllipsisColsToAsign = data.ContainsKey("EllipsisColsToAsign") ? DatService.GetFullProperty(data, "EllipsisColsToAsign") : "";
             var ellipsisColsToAsignTokens = string.IsNullOrEmpty(fullEllipsisColsToAsign)
                 ? new string[0]
                 : fullEllipsisColsToAsign.Split(new[] { '~' }, StringSplitOptions.None);
 
-            var fullEllipsisColsToAlias = data.ContainsKey("EllipsisColsToAlias") ? GetFullProperty(data, "EllipsisColsToAlias") : "";
+            var fullEllipsisColsToAlias = data.ContainsKey("EllipsisColsToAlias") ? DatService.GetFullProperty(data, "EllipsisColsToAlias") : "";
             var ellipsisColsToAliasTokens = string.IsNullOrEmpty(fullEllipsisColsToAlias)
                 ? new string[0]
                 : fullEllipsisColsToAlias.Split(new[] { '~' }, StringSplitOptions.None);
@@ -737,256 +739,6 @@ namespace DatEditorVDGrid
             MessageBox.Show("DAT cargado correctamente");
         }
 
-        private string GetFullProperty(Dictionary<string, string> data, string baseKey)
-        {
-            var parts = new List<string>();
-
-            int i = 1;
-
-            while (true)
-            {
-                string key = (i == 1) ? baseKey : $"{baseKey}{i}";
-
-                if (!data.ContainsKey(key))
-                    break;
-
-                parts.Add(data[key]);
-                i++;
-            }
-
-            return string.Join(" ", parts);
-        }
-
-        private List<string> SplitSqlColumns(string input)
-        {
-            var result = new List<string>();
-            int parenLevel = 0;
-            var current = new StringBuilder();
-
-            foreach (char c in input)
-            {
-                if (c == '(') parenLevel++;
-                if (c == ')') parenLevel--;
-
-                if (c == ',' && parenLevel == 0)
-                {
-                    result.Add(current.ToString());
-                    current.Clear();
-                }
-                else
-                {
-                    current.Append(c);
-                }
-            }
-
-            if (current.Length > 0)
-                result.Add(current.ToString());
-
-            return result;
-        }
-
-        // Trim trailing empty or whitespace-only tokens from a list in-place.
-        private void TrimTrailingEmpty(List<string> list)
-        {
-            for (int k = list.Count - 1; k >= 0; k--)
-            {
-                if (string.IsNullOrWhiteSpace(list[k]))
-                    list.RemoveAt(k);
-                else
-                    break;
-            }
-        }
-
-        // Divide una cadena en trozos procurando no cortar palabras ni campos:
-        // - Primero intenta partir en la última coma dentro del límite.
-        // - Si no hay coma, busca el último espacio dentro del límite.
-        // - Si no hay donde partir, usa el límite máximo.
-        // El parámetro maxChunkLength se refiere a la longitud máxima permitida para cada trozo
-        // (excluyendo la longitud de la cabecera "Key=" que se maneja en AppendWrappedProperty).
-        private List<string> SplitSqlIntoLines(string sql, int maxChunkLength = 255)
-        {
-            var result = new List<string>();
-
-            sql = (sql ?? "").Trim();
-
-            while (sql.Length > maxChunkLength)
-            {
-                int searchIndex = Math.Min(maxChunkLength - 1, sql.Length - 1);
-
-                int commaPos = sql.LastIndexOf(',', searchIndex);
-                if (commaPos > 0)
-                {
-                    // incluir la coma en el chunk; la longitud será commaPos+1 <= maxChunkLength
-                    int len = commaPos + 1;
-                    var chunk = sql.Substring(0, len).Trim();
-                    result.Add(chunk);
-                    sql = sql.Substring(len).Trim();
-                    continue;
-                }
-
-                int spacePos = sql.LastIndexOf(' ', searchIndex);
-                if (spacePos > 0)
-                {
-                    // no incluir el espacio final en el chunk
-                    int len = spacePos;
-                    var chunk = sql.Substring(0, len).Trim();
-                    result.Add(chunk);
-                    sql = sql.Substring(len).Trim();
-                    continue;
-                }
-
-                // no encontramos coma ni espacio, partir en el límite
-                int take = Math.Min(maxChunkLength, sql.Length);
-                var forced = sql.Substring(0, take).Trim();
-                result.Add(forced);
-                sql = sql.Substring(take).Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(sql))
-                result.Add(sql);
-
-            return result;
-        }
-
-        // Construye líneas numeradas (Key, Key2, Key3...) asegurando que cada línea (incluyendo "Key=") no supere 255 chars.
-        private void AppendWrappedProperty(StringBuilder sb, string key, string value)
-        {
-            // Si null -> tratar como vacío
-            value = value ?? "";
-
-            int maxLine = 255;
-            int prefixLength = key.Length + 1; // key + '='
-            int chunkMax = System.Math.Max(1, maxLine - prefixLength);
-
-            var chunks = SplitSqlIntoLines(value, chunkMax);
-
-            if (chunks.Count == 0)
-            {
-                sb.AppendLine($"{key}=");
-                return;
-            }
-
-            for (int i = 0; i < chunks.Count; i++)
-            {
-                if (i == 0)
-                    sb.AppendLine($"{key}={chunks[i]}");
-                else
-                    sb.AppendLine($"{key}{i + 1}={chunks[i]}");
-            }
-        }
-
-        // Helper: compute wrapped chunks for a given key respecting the 255 chars limit per full line (key + '=' + chunk).
-        private List<string> GetWrappedChunks(string key, string value)
-        {
-            value = value ?? "";
-            int maxLine = 255;
-            int prefixLength = key.Length + 1; // key + '='
-            int chunkMax = System.Math.Max(1, maxLine - prefixLength);
-            return SplitSqlIntoLines(value, chunkMax);
-        }
-
-        // Helper: write numbered keys (Key, Key2, Key3...) using wrapped chunks distribution.
-        // Writes at least totalSlots entries but will expand if the wrapped chunks exceed that number
-        // so imported .dat content is not truncated.
-        private void WriteNumberedKeys(StringBuilder sb, string baseKey, string value, int totalSlots)
-        {
-            var chunks = GetWrappedChunks(baseKey, value);
-            int count = Math.Max(totalSlots, chunks.Count);
-            for (int i = 0; i < count; i++)
-            {
-                string key = (i == 0) ? baseKey : $"{baseKey}{i + 1}";
-                string val = (i < chunks.Count) ? chunks[i] : "";
-                sb.AppendLine($"{key}={val}");
-            }
-        }
-
-        private void SplitSelectFrom(string fullSql, out string selectPart, out string fromPart)
-        {
-            selectPart = fullSql;
-            fromPart = "";
-
-            var lower = (fullSql ?? "").ToLower();
-            int idx = lower.IndexOf(" from ");
-            if (idx >= 0)
-            {
-                selectPart = fullSql.Substring(0, idx);
-                fromPart = fullSql.Substring(idx + 1).Trim(); // includes "from ..." (starting at 'from')
-            }
-        }
-
-        // Extrae el nombre de la tabla principal desde la parte que comienza con "from".
-        // Si no puede identificar, devuelve cadena vacía.
-        private string ExtractMainTableFromFromPart(string fromPart)
-        {
-            var lower = (fromPart ?? "").ToLower();
-            int idxFrom = lower.IndexOf("from");
-            string tail = (idxFrom >= 0) ? fromPart.Substring(idxFrom + 4).Trim() : (fromPart ?? "").Trim();
-
-            // cortar antes de WHERE/ORDER/GROUP/HAVING/LIMIT
-            string[] terminators = new[] { " where ", " order ", " group ", " having ", " limit " };
-            int endIdx = -1;
-            foreach (var t in terminators)
-            {
-                int p = tail.ToLower().IndexOf(t);
-                if (p >= 0)
-                {
-                    if (endIdx < 0 || p < endIdx)
-                    {
-                        endIdx = p;
-                    }
-                }
-            }
-
-            if (endIdx >= 0)
-                tail = tail.Substring(0, endIdx).Trim();
-
-            // Si hay joins, la primera palabra suele ser la tabla principal
-            // Tomar la primera token (antes de espacios, comas o alias)
-            var tokens = tail.Split(new[] { ' ', '\t', '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Length == 0)
-                return "";
-
-            // tokens[0] es la tabla principal (puede ser schema.table)
-            return tokens[0];
-        }
-
-        // Extrae el alias principal (si existe) junto a la tabla en FROM.
-        // Por ejemplo: "from TalRecepcionDet d inner join ..." -> devuelve "d"
-        private string ExtractMainTableAliasFromFromPart(string fromPart)
-        {
-            if (string.IsNullOrWhiteSpace(fromPart))
-                return "";
-
-            var lower = fromPart.ToLower();
-            int idxFrom = lower.IndexOf("from");
-            string tail = (idxFrom >= 0) ? fromPart.Substring(idxFrom + 4).Trim() : fromPart.Trim();
-
-            // cortar antes de WHERE/ORDER/GROUP/HAVING/LIMIT
-            string[] terminators = new[] { " where ", " order ", " group ", " having ", " limit " };
-            int endIdx = -1;
-            foreach (var t in terminators)
-            {
-                int p = tail.ToLower().IndexOf(t);
-                if (p >= 0)
-                {
-                    if (endIdx < 0 || p < endIdx) endIdx = p;
-                }
-            }
-            if (endIdx >= 0) tail = tail.Substring(0, endIdx).Trim();
-
-            var tokens = tail.Split(new[] { ' ', '\t', '\r', '\n', ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Length < 2)
-                return ""; // no alias token present
-
-            // tokens[0] = table, tokens[1] might be alias unless it's a join keyword
-            var candidate = tokens[1];
-            string[] reserved = new[] { "inner", "left", "right", "full", "outer", "join", "on", "as" };
-            if (reserved.Contains(candidate.ToLower()))
-                return "";
-
-            return candidate;
-        }
-
         // New: handle changes in richSelect (uppercase reserved words and color them when a word completes)
         private void richSelect_TextChanged(object sender, EventArgs e)
         {
@@ -1000,151 +752,14 @@ namespace DatEditorVDGrid
                 return;
             }
 
-            ApplySqlKeywordHighlight(richSelect, uppercaseKeywords: true);
-        }
-
-        // Apply uppercase (optional) and color highlighting for SQL keywords inside a RichTextBox.
-        // Preserves caret/selection.
-        private void ApplySqlKeywordHighlight(RichTextBox rtb, bool uppercaseKeywords)
-        {
-            if (rtb == null) return;
-
-            int origSelStart = rtb.SelectionStart;
-            int origSelLen = rtb.SelectionLength;
-
-            string originalText = rtb.Text ?? "";
-            string processedText = originalText;
-
-            if (uppercaseKeywords)
-            {
-                // Replace occurrences of keywords with their uppercase form (length unchanged)
-                foreach (var kw in _sqlKeywords)
-                {
-                    processedText = Regex.Replace(processedText, $@"\b{Regex.Escape(kw)}\b", kw, RegexOptions.IgnoreCase);
-                }
-            }
-
-            // Only assign Text if changed to avoid recursive TextChanged churn
-            bool textChanged = !string.Equals(originalText, processedText, System.StringComparison.Ordinal);
-            if (textChanged)
-            {
-                _suppressRichSelectTextChanged = true;
-                try
-                {
-                    rtb.Text = processedText;
-                }
-                finally
-                {
-                    _suppressRichSelectTextChanged = false;
-                }
-            }
-
-            // Do not force a specific global text color; use control ForeColor for non-keywords
-            Color normalColor = rtb.ForeColor;
-
-            string textToScan = rtb.Text ?? "";
-
-            // Color each keyword occurrence; leave other text colors as-is (we set keyword color directly)
-            foreach (var kw in _sqlKeywords)
-            {
-                string pattern = $@"\b{Regex.Escape(kw)}\b";
-                foreach (Match m in Regex.Matches(textToScan, pattern, RegexOptions.IgnoreCase))
-                {
-                    rtb.Select(m.Index, m.Length);
-                    if (string.Equals(kw, "ON", System.StringComparison.OrdinalIgnoreCase) || string.Equals(kw, "AS", System.StringComparison.OrdinalIgnoreCase))
-                        rtb.SelectionColor = _keywordColor;
-                    else
-                        rtb.SelectionColor = _joinColor;
-                }
-            }
-
-            // Restore original selection and selection color
-            if (origSelStart >= 0 && origSelStart <= rtb.Text.Length)
-            {
-                rtb.SelectionStart = origSelStart;
-                rtb.SelectionLength = origSelLen;
-            }
-            else
-            {
-                rtb.SelectionStart = rtb.Text.Length;
-                rtb.SelectionLength = 0;
-            }
-            rtb.SelectionColor = normalColor;
-            rtb.DeselectAll();
-        }
-
-        // Highlight separators (commas and tildes) inside generated .dat shown in richSalida.
-        // IMPORTANT: do not change background/overall forecolor of the RichTextBox here.
-        // Only color separator characters so the user can choose overall colors in designer/properties.
-        private void HighlightSeparators(RichTextBox rtb, char[] separators, Color sepColor)
-        {
-            if (rtb == null) return;
-
-            int origSelStart = rtb.SelectionStart;
-            int origSelLen = rtb.SelectionLength;
-
-            string text = rtb.Text ?? "";
-            for (int i = 0; i < text.Length; i++)
-            {
-                if (separators.Contains(text[i]))
-                {
-                    rtb.Select(i, 1);
-                    rtb.SelectionColor = sepColor;
-                }
-            }
-
-            // Restore selection and selection color to match current ForeColor
-            if (origSelStart >= 0 && origSelStart <= rtb.Text.Length)
-            {
-                rtb.SelectionStart = origSelStart;
-                rtb.SelectionLength = origSelLen;
-            }
-            else
-            {
-                rtb.SelectionStart = rtb.Text.Length;
-                rtb.SelectionLength = 0;
-            }
-            rtb.SelectionColor = rtb.ForeColor;
-            rtb.DeselectAll();
-        }
-
-        // Commit checkbox edits immediately so CellValueChanged fires.
-        private void dgvColumns_CurrentCellDirtyStateChanged(object sender, EventArgs e)
-        {
-            if (dgvColumns.IsCurrentCellDirty)
-            {
-                dgvColumns.CommitEdit(DataGridViewDataErrorContexts.Commit);
-            }
-        }
-
-        // When the Ellipsis checkbox changes, set/clear the EllipsisSqlSources cell with the uppercase CampoSQL.
-        // DO NOT clear per-row EllipsisColsToShowfrmSearch/ToAsign/ToAlias values.
-        private void dgvColumns_CellValueChanged(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0 || e.ColumnIndex < 0)
-                return;
-
-            var colName = dgvColumns.Columns[e.ColumnIndex].Name;
-            if (!string.Equals(colName, "Ellipsis", System.StringComparison.OrdinalIgnoreCase))
-                return;
-
-            var row = dgvColumns.Rows[e.RowIndex];
-            bool isEllipsis = Convert.ToBoolean(row.Cells["Ellipsis"].Value ?? false);
-
-            var campoObj = row.Cells["CampoSQL"].Value;
-            string campo = campoObj?.ToString() ?? "";
-
-            if (isEllipsis)
-            {
-                // put uppercase CampoSQL into EllipsisSqlSources so generated .dat has a hint
-                // do not touch EllipsisColsToShowfrmSearch, EllipsisColsToAsign or EllipsisColsToAlias
-                row.Cells["EllipsisSqlSources"].Value = campo.ToUpperInvariant();
-            }
-            else
-            {
-                // if unchecked, clear ellipsis sql source but keep other per-row tokens intact
-                row.Cells["EllipsisSqlSources"].Value = "";
-            }
+            RichTextHelper.ApplySqlKeywordHighlight(
+                richSelect,
+                _sqlKeywords,
+                _joinColor,
+                _keywordColor,
+                ref _suppressRichSelectTextChanged,
+                true
+            );
         }
     }//Form
 }//namespace
