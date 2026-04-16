@@ -536,17 +536,18 @@ namespace DatEditorVDGrid
             string multipleSubTotalsVal = _subTotalsProps.ContainsKey("MultipleSubTotals") ? _subTotalsProps["MultipleSubTotals"] : "";
             sb.AppendLine($"MultipleSubTotals={multipleSubTotalsVal}");
 
-            // SubTotalsGroups: always emit a comma-separated list sized to fieldCount.
+            // SubTotalsGroups: emit a comma-separated list sized to fieldCount.
+            // If one or more SubTotal checkboxes are checked -> "1,0,0,..."
+            // Otherwise -> all zeros
             string subTotalsGroupsOut;
             if (markedSubTotalCount > 0)
             {
-                // first positions = 1 (count = markedSubTotalCount), rest zeros
-                subTotalsGroupsOut = string.Join(",", Enumerable.Repeat("1", markedSubTotalCount).Concat(Enumerable.Repeat("0", Math.Max(0, fieldCount - markedSubTotalCount))));
+                // single leading 1, rest zeros
+                subTotalsGroupsOut = "1" + (fieldCount > 1 ? "," + string.Join(",", Enumerable.Repeat("0", fieldCount - 1)) : "");
             }
             else
             {
-                // preserve original if present, otherwise zeros
-                subTotalsGroupsOut = _subTotalsProps.ContainsKey("SubTotalsGroups") ? _subTotalsProps["SubTotalsGroups"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
+                subTotalsGroupsOut = string.Join(",", Enumerable.Repeat("0", fieldCount));
             }
             sb.AppendLine($"SubTotalsGroups={subTotalsGroupsOut}");
 
@@ -942,11 +943,22 @@ namespace DatEditorVDGrid
                 ? new string[0]
                 : fullInsNewRowAfter.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToArray();
 
-            // NEW: load SubTotalsGroups tokens to mark per-row SubTotal checkbox
-            var fullSubTotalsGroups = _subTotalsProps.ContainsKey("SubTotalsGroups") ? _subTotalsProps["SubTotalsGroups"] : "";
-            var subTotalsGroupsTokens = string.IsNullOrEmpty(fullSubTotalsGroups)
+            // NEW: parse SubTotalsSummary first token (comma list) and use it to mark checkboxes.
+            var fullSubTotalsSummary = _subTotalsProps.ContainsKey("SubTotalsSummary") ? _subTotalsProps["SubTotalsSummary"] : "";
+            var subTotalsSummaryTokens = string.IsNullOrEmpty(fullSubTotalsSummary)
                 ? new string[0]
-                : fullSubTotalsGroups.Split(new[] { ',' }, StringSplitOptions.None);
+                : fullSubTotalsSummary.Split(new[] { '~' }, StringSplitOptions.None);
+
+            var subTotalsNameSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (subTotalsSummaryTokens.Length > 0 && !string.IsNullOrWhiteSpace(subTotalsSummaryTokens[0]) && subTotalsSummaryTokens[0] != "0")
+            {
+                foreach (var n in subTotalsSummaryTokens[0].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var trimmed = n.Trim();
+                    if (!string.IsNullOrEmpty(trimmed))
+                        subTotalsNameSet.Add(trimmed);
+                }
+            }
 
             for (int i = 0; i < campos.Count; i++)
             {
@@ -1053,8 +1065,16 @@ namespace DatEditorVDGrid
                     string.Equals(t, StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
                 dgvColumns.Rows[rowIndex].Cells["InsNewRowAfter"].Value = insMark;
 
-                // Mark SubTotal checkbox based on SubTotalsGroups token (imported mapping)
-                bool subTotalMark = (i < subTotalsGroupsTokens.Length && subTotalsGroupsTokens[i].Trim() == "1");
+                // Mark SubTotal checkbox ONLY if this field is listed in SubTotalsSummary first token
+                bool subTotalMark = false;
+                if (subTotalsNameSet.Count > 0)
+                {
+                    var stripped = StripTablePrefix(campo);
+                    if (!string.IsNullOrEmpty(alias) && subTotalsNameSet.Contains(alias))
+                        subTotalMark = true;
+                    else if (!string.IsNullOrEmpty(stripped) && subTotalsNameSet.Contains(stripped))
+                        subTotalMark = true;
+                }
                 dgvColumns.Rows[rowIndex].Cells["SubTotal"].Value = subTotalMark;
 
                 // If this column name (alias or campo without table prefix) is listed in ColsToEdit => mark Editable
