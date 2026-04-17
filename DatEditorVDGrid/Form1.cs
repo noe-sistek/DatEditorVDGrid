@@ -3,6 +3,11 @@ using DatEditorVDGrid.Services;
 using DatEditorVDGrid.UIHelpers;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
@@ -16,20 +21,8 @@ namespace DatEditorVDGrid
 {
     public partial class Form1 : Form
     {
-        // Holds a global EllipsisColsToShowfrmSearch value when the .dat provides a single long CSV
-        private string _globalEllipsisColsToShow = "";
-
-        // preserve full loaded values for EllipsisColsToAsign / EllipsisColsToAlias so we can
-        // write them back unchanged (split into numbered lines respecting 255 chars).
-        private string _fullEllipsisColsToAsign = "";
-        private string _fullEllipsisColsToAlias = "";
-
-        // Preserve behavior, formatting, masked and ellipsis extra properties loaded from the .dat so we can re-emit them unchanged
-        private readonly Dictionary<string, string> _behaviorProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _formattingProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _maskedProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _ellipsisExtraProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _subTotalsProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Encapsulated preserved .dat state and helpers
+        private readonly DatOptions _options = new DatOptions();
 
         // Syntax/coloring settings for SQL keywords and output separators
         private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
@@ -202,28 +195,6 @@ namespace DatEditorVDGrid
             dgvColumns.Rows[rowIndex].Cells["CampoSQL"].Value = "";
         }
 
-        // Helper: strip table alias prefix if present (e.g. "d.Cantidad" => "Cantidad")
-        private static string StripTablePrefix(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-                return name;
-            var idx = name.LastIndexOf('.');
-            if (idx >= 0 && idx < name.Length - 1)
-                return name.Substring(idx + 1);
-            return name;
-        }
-
-        // Helper: return preserved value if present otherwise create a repeated "0" token list of length count using sep
-        private static string PreserveOrRepeat(Dictionary<string, string> dict, string key, char sep, int count)
-        {
-            if (dict != null && dict.TryGetValue(key, out var val) && !string.IsNullOrEmpty(val))
-                return val;
-            if (count <= 0)
-                return "";
-            var token = "0";
-            return string.Join(sep.ToString(), Enumerable.Repeat(token, count));
-        }
-
         private void btnGenerate_Click(object sender, EventArgs e)
         {
             // Only include rows with a non-empty CampoSQL (avoid generating many empty tokens)
@@ -296,7 +267,7 @@ namespace DatEditorVDGrid
                 if (insNewAfter)
                 {
                     // prefer alias when present otherwise campo name WITHOUT table prefix
-                    var fieldName = !string.IsNullOrWhiteSpace(alias) ? alias : StripTablePrefix(campo);
+                    var fieldName = !string.IsNullOrWhiteSpace(alias) ? alias : DatOptions.StripTablePrefix(campo);
                     if (!string.IsNullOrEmpty(fieldName))
                         insNewRowSelected.Add(fieldName);
                 }
@@ -306,7 +277,7 @@ namespace DatEditorVDGrid
                 if (isSubTotal)
                 {
                     // prefer alias, otherwise stripped campo
-                    var name = !string.IsNullOrWhiteSpace(alias) ? alias : StripTablePrefix(campo);
+                    var name = !string.IsNullOrWhiteSpace(alias) ? alias : DatOptions.StripTablePrefix(campo);
                     if (!string.IsNullOrEmpty(name))
                     {
                         markedSubTotalNames.Add(name);
@@ -419,11 +390,11 @@ namespace DatEditorVDGrid
             sb.AppendLine("[MaskedCols]");
 
             // ColComboSqlSources: use preserved value or generate "~" separated zeros count = fieldCount
-            var colComboSqlSourcesVal = PreserveOrRepeat(_maskedProps, "ColComboSqlSources", '~', fieldCount);
+            var colComboSqlSourcesVal = DatOptions.PreserveOrRepeat(_options.MaskedProps, "ColComboSqlSources", '~', fieldCount);
             sb.AppendLine($"ColComboSqlSources={colComboSqlSourcesVal}");
 
             // ColComboEditables: preserved or comma-separated zeros
-            var colComboEditablesVal = PreserveOrRepeat(_maskedProps, "ColComboEditables", ',', fieldCount);
+            var colComboEditablesVal = DatOptions.PreserveOrRepeat(_options.MaskedProps, "ColComboEditables", ',', fieldCount);
             sb.AppendLine($"ColComboEditables={colComboEditablesVal}");
 
             // [Ellipsiscols]
@@ -450,29 +421,29 @@ namespace DatEditorVDGrid
             string ellipsisColsToShowJoined = "";
             if (ellipsisColsToShow.Any(s => !string.IsNullOrWhiteSpace(s)))
                 ellipsisColsToShowJoined = string.Join("~", ellipsisColsToShow);
-            else if (!string.IsNullOrWhiteSpace(_globalEllipsisColsToShow))
-                ellipsisColsToShowJoined = _globalEllipsisColsToShow;
+            else if (!string.IsNullOrWhiteSpace(_options.GlobalEllipsisColsToShow))
+                ellipsisColsToShowJoined = _options.GlobalEllipsisColsToShow;
             sb.AppendLine($"EllipsisColsToShowfrmSearch={ellipsisColsToShowJoined}");
 
             // EllipsisColsToAsign (three keys)
-            string ellipsisColsToAsignJoined = (ellipsisColsToAsign.Count > 0) ? string.Join("~", ellipsisColsToAsign) : _fullEllipsisColsToAsign ?? "";
+            string ellipsisColsToAsignJoined = (ellipsisColsToAsign.Count > 0) ? string.Join("~", ellipsisColsToAsign) : _options.FullEllipsisColsToAsign ?? "";
             DatWriterHelper.WriteNumberedKeys(sb, "EllipsisColsToAsign", ellipsisColsToAsignJoined, 2);
 
             // EllipsisColsToAlias (single key)
-            string ellipsisColsToAliasJoined = (ellipsisColsToAlias.Count > 0) ? string.Join("~", ellipsisColsToAlias) : _fullEllipsisColsToAlias ?? "";
+            string ellipsisColsToAliasJoined = (ellipsisColsToAlias.Count > 0) ? string.Join("~", ellipsisColsToAlias) : _options.FullEllipsisColsToAlias ?? "";
             sb.AppendLine($"EllipsisColsToAlias={ellipsisColsToAliasJoined}");
 
             // Now emit the remaining ellipsis extra properties (preserve or generate appropriate zeros)
-            sb.AppendLine($"EllipsisColInvokeColor={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeColor", ',', fieldCount)}");
-            sb.AppendLine($"EllipsisColInvokeFont={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeFont", ',', fieldCount)}");
-            sb.AppendLine($"EllipsisColsNewFields={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewFields", '~', fieldCount)}");
-            sb.AppendLine($"EllipsisColsNewCaption={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewCaption", '~', fieldCount)}");
-            sb.AppendLine($"EllipsisColsNewDataTypes={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewDataTypes", '~', fieldCount)}");
-            sb.AppendLine($"EllipsisColsNewTableNames={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColsNewTableNames", ',', fieldCount)}");
-            sb.AppendLine($"EllipsisColInvokeOpen={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeOpen", ',', fieldCount)}");
-            sb.AppendLine($"EllipsisColOpenFilters={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColOpenFilters", '~', fieldCount)}");
-            sb.AppendLine($"EllipsisColInvokeBrowse={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColInvokeBrowse", ',', fieldCount)}");
-            sb.AppendLine($"EllipsisColShellExec={PreserveOrRepeat(_ellipsisExtraProps, "EllipsisColShellExec", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColInvokeColor={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColInvokeColor", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColInvokeFont={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColInvokeFont", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewFields={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColsNewFields", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewCaption={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColsNewCaption", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewDataTypes={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColsNewDataTypes", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColsNewTableNames={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColsNewTableNames", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColInvokeOpen={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColInvokeOpen", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColOpenFilters={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColOpenFilters", '~', fieldCount)}");
+            sb.AppendLine($"EllipsisColInvokeBrowse={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColInvokeBrowse", ',', fieldCount)}");
+            sb.AppendLine($"EllipsisColShellExec={DatOptions.PreserveOrRepeat(_options.EllipsisExtraProps, "EllipsisColShellExec", ',', fieldCount)}");
 
             // [Formatting]
             sb.AppendLine();
@@ -486,10 +457,10 @@ namespace DatEditorVDGrid
             sb.AppendLine($"Widths={string.Join(",", widths)}");
 
             // Emit preserved formatting keys when available, otherwise blank (these are single-line keys not per-column)
-            sb.AppendLine($"Height={(_formattingProps.ContainsKey("Height") ? _formattingProps["Height"] : "")}");
-            sb.AppendLine($"ResizeCols={(_formattingProps.ContainsKey("ResizeCols") ? _formattingProps["ResizeCols"] : "")}");
-            sb.AppendLine($"ResizeRows={(_formattingProps.ContainsKey("ResizeRows") ? _formattingProps["ResizeRows"] : "")}");
-            sb.AppendLine($"MoveCols={(_formattingProps.ContainsKey("MoveCols") ? _formattingProps["MoveCols"] : "")}");
+            sb.AppendLine($"Height={(_options.FormattingProps.ContainsKey("Height") ? _options.FormattingProps["Height"] : "")}");
+            sb.AppendLine($"ResizeCols={(_options.FormattingProps.ContainsKey("ResizeCols") ? _options.FormattingProps["ResizeCols"] : "")}");
+            sb.AppendLine($"ResizeRows={(_options.FormattingProps.ContainsKey("ResizeRows") ? _options.FormattingProps["ResizeRows"] : "")}");
+            sb.AppendLine($"MoveCols={(_options.FormattingProps.ContainsKey("MoveCols") ? _options.FormattingProps["MoveCols"] : "")}");
 
             // Keep UI-driven Editable (chkEditable) — this is already set on load from the .dat
             sb.AppendLine($"Editable={(chkEditable.Checked ? "1" : "0")}");
@@ -502,7 +473,7 @@ namespace DatEditorVDGrid
                     var alias = (r.Cells["Alias"].Value ?? "").ToString().Trim();
                     if (!string.IsNullOrEmpty(alias))
                         return alias;
-                    return StripTablePrefix((r.Cells["CampoSQL"].Value ?? "").ToString().Trim());
+                    return DatOptions.StripTablePrefix((r.Cells["CampoSQL"].Value ?? "").ToString().Trim());
                 })
                 .Where(s => !string.IsNullOrEmpty(s))
                 .ToList();
@@ -514,15 +485,15 @@ namespace DatEditorVDGrid
             sb.AppendLine($"FormatStrings={string.Join("~", formats)}");
 
             // Emit rest of formatting flags from preserved values
-            sb.AppendLine($"ExplorerBar={(_formattingProps.ContainsKey("ExplorerBar") ? _formattingProps["ExplorerBar"] : "")}");
-            sb.AppendLine($"AutoSearch={(_formattingProps.ContainsKey("AutoSearch") ? _formattingProps["AutoSearch"] : "")}");
-            sb.AppendLine($"SelectFullRow={(_formattingProps.ContainsKey("SelectFullRow") ? _formattingProps["SelectFullRow"] : "")}");
-            sb.AppendLine($"MergeCells={(_formattingProps.ContainsKey("MergeCells") ? _formattingProps["MergeCells"] : "")}");
-            sb.AppendLine($"OutlineBar={(_formattingProps.ContainsKey("OutlineBar") ? _formattingProps["OutlineBar"] : "")}");
-            sb.AppendLine($"BlankLinesOnEdit={(_formattingProps.ContainsKey("BlankLinesOnEdit") ? _formattingProps["BlankLinesOnEdit"] : "")}");
-            sb.AppendLine($"FrozenRows={(_formattingProps.ContainsKey("FrozenRows") ? _formattingProps["FrozenRows"] : "")}");
-            sb.AppendLine($"FrozenCols={(_formattingProps.ContainsKey("FrozenCols") ? _formattingProps["FrozenCols"] : "")}");
-            sb.AppendLine($"WordWrap={(_formattingProps.ContainsKey("WordWrap") ? _formattingProps["WordWrap"] : "")}");
+            sb.AppendLine($"ExplorerBar={(_options.FormattingProps.ContainsKey("ExplorerBar") ? _options.FormattingProps["ExplorerBar"] : "")}");
+            sb.AppendLine($"AutoSearch={(_options.FormattingProps.ContainsKey("AutoSearch") ? _options.FormattingProps["AutoSearch"] : "")}");
+            sb.AppendLine($"SelectFullRow={(_options.FormattingProps.ContainsKey("SelectFullRow") ? _options.FormattingProps["SelectFullRow"] : "")}");
+            sb.AppendLine($"MergeCells={(_options.FormattingProps.ContainsKey("MergeCells") ? _options.FormattingProps["MergeCells"] : "")}");
+            sb.AppendLine($"OutlineBar={(_options.FormattingProps.ContainsKey("OutlineBar") ? _options.FormattingProps["OutlineBar"] : "")}");
+            sb.AppendLine($"BlankLinesOnEdit={(_options.FormattingProps.ContainsKey("BlankLinesOnEdit") ? _options.FormattingProps["BlankLinesOnEdit"] : "")}");
+            sb.AppendLine($"FrozenRows={(_options.FormattingProps.ContainsKey("FrozenRows") ? _options.FormattingProps["FrozenRows"] : "")}");
+            sb.AppendLine($"FrozenCols={(_options.FormattingProps.ContainsKey("FrozenCols") ? _options.FormattingProps["FrozenCols"] : "")}");
+            sb.AppendLine($"WordWrap={(_options.FormattingProps.ContainsKey("WordWrap") ? _options.FormattingProps["WordWrap"] : "")}");
 
             // [SubTotals]
             sb.AppendLine();
@@ -533,7 +504,7 @@ namespace DatEditorVDGrid
             sb.AppendLine($"Totales={totalesVal}");
 
             // Preserve MultipleSubTotals if imported, otherwise emit preserved or blank
-            string multipleSubTotalsVal = _subTotalsProps.ContainsKey("MultipleSubTotals") ? _subTotalsProps["MultipleSubTotals"] : "";
+            string multipleSubTotalsVal = _options.SubTotalsProps.ContainsKey("MultipleSubTotals") ? _options.SubTotalsProps["MultipleSubTotals"] : "";
             sb.AppendLine($"MultipleSubTotals={multipleSubTotalsVal}");
 
             // SubTotalsGroups: emit a comma-separated list sized to fieldCount.
@@ -561,20 +532,20 @@ namespace DatEditorVDGrid
             }
             else
             {
-                subTotalsSummaryOut = _subTotalsProps.ContainsKey("SubTotalsSummary") ? _subTotalsProps["SubTotalsSummary"] : string.Join("~", Enumerable.Repeat("0", fieldCount));
+                subTotalsSummaryOut = _options.SubTotalsProps.ContainsKey("SubTotalsSummary") ? _options.SubTotalsProps["SubTotalsSummary"] : string.Join("~", Enumerable.Repeat("0", fieldCount));
             }
             sb.AppendLine($"SubTotalsSummary={subTotalsSummaryOut}");
 
             // SubTotalBkColors and SubTotalCaptions: preserve or emit comma zeros of length fieldCount
-            string bkcolorsOut = _subTotalsProps.ContainsKey("SubTotalBkColors") ? _subTotalsProps["SubTotalBkColors"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
+            string bkcolorsOut = _options.SubTotalsProps.ContainsKey("SubTotalBkColors") ? _options.SubTotalsProps["SubTotalBkColors"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
             sb.AppendLine($"SubTotalBkColors={bkcolorsOut}");
 
-            string captionsOut = _subTotalsProps.ContainsKey("SubTotalCaptions") ? _subTotalsProps["SubTotalCaptions"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
+            string captionsOut = _options.SubTotalsProps.ContainsKey("SubTotalCaptions") ? _options.SubTotalsProps["SubTotalCaptions"] : string.Join(",", Enumerable.Repeat("0", fieldCount));
             sb.AppendLine($"SubTotalCaptions={captionsOut}");
 
             // SubTotalsEditable, DetailEditable preserve
-            sb.AppendLine($"SubTotalsEditable={(_subTotalsProps.ContainsKey("SubTotalsEditable") ? _subTotalsProps["SubTotalsEditable"] : "")}");
-            sb.AppendLine($"DetailEditable={(_subTotalsProps.ContainsKey("DetailEditable") ? _subTotalsProps["DetailEditable"] : "")}");
+            sb.AppendLine($"SubTotalsEditable={(_options.SubTotalsProps.ContainsKey("SubTotalsEditable") ? _options.SubTotalsProps["SubTotalsEditable"] : "")}");
+            sb.AppendLine($"DetailEditable={(_options.SubTotalsProps.ContainsKey("DetailEditable") ? _options.SubTotalsProps["DetailEditable"] : "")}");
 
             // [Behavior]
             sb.AppendLine();
@@ -606,12 +577,12 @@ namespace DatEditorVDGrid
             // Emit preserved behavior keys in the same order; if not present keep empty
             foreach (var key in behaviorKeys)
             {
-                var val = _behaviorProps.ContainsKey(key) ? _behaviorProps[key] : "";
+                var val = _options.BehaviorProps.ContainsKey(key) ? _options.BehaviorProps[key] : "";
                 sb.AppendLine($"{key}={val}");
             }
 
             // InsNewRowAfterCols: prefer generated CSV from per-row checkboxes; if none selected, emit original value preserved
-            string insJoined = insNewRowSelected.Count > 0 ? string.Join(",", insNewRowSelected) : (_behaviorProps.ContainsKey("InsNewRowAfterCols") ? _behaviorProps["InsNewRowAfterCols"] : "");
+            string insJoined = insNewRowSelected.Count > 0 ? string.Join(",", insNewRowSelected) : (_options.BehaviorProps.ContainsKey("InsNewRowAfterCols") ? _options.BehaviorProps["InsNewRowAfterCols"] : "");
             sb.AppendLine($"InsNewRowAfterCols={insJoined}");
 
             // [Validate]
@@ -678,14 +649,7 @@ namespace DatEditorVDGrid
             }
 
             // reset holders
-            _globalEllipsisColsToShow = "";
-            _fullEllipsisColsToAsign = "";
-            _fullEllipsisColsToAlias = "";
-            _behaviorProps.Clear();
-            _formattingProps.Clear();
-            _maskedProps.Clear();
-            _ellipsisExtraProps.Clear();
-            _subTotalsProps.Clear();
+            _options.Reset();
 
             var fullSource = DatService.GetFullProperty(data, "SourceSql");
 
@@ -723,9 +687,9 @@ namespace DatEditorVDGrid
 
             // NEW: load EllipsisColsToAsign / EllipsisColsToAlias full values for later re-output
             if (data.ContainsKey("EllipsisColsToAsign"))
-                _fullEllipsisColsToAsign = DatService.GetFullProperty(data, "EllipsisColsToAsign");
+                _options.FullEllipsisColsToAsign = DatService.GetFullProperty(data, "EllipsisColsToAsign");
             if (data.ContainsKey("EllipsisColsToAlias"))
-                _fullEllipsisColsToAlias = DatService.GetFullProperty(data, "EllipsisColsToAlias");
+                _options.FullEllipsisColsToAlias = DatService.GetFullProperty(data, "EllipsisColsToAlias");
 
             // Preserve Behavior keys found in the imported .dat so we can write them back unchanged later
             string[] behaviorKeysToPreserve = new[]
@@ -752,7 +716,7 @@ namespace DatEditorVDGrid
             foreach (var k in behaviorKeysToPreserve)
             {
                 if (data.ContainsKey(k))
-                    _behaviorProps[k] = DatService.GetFullProperty(data, k) ?? "";
+                    _options.BehaviorProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
             // Preserve Formatting keys that are NOT per-column (we already handle Headers/Widths/ColsToEdit/FormatStrings from grid)
@@ -775,7 +739,7 @@ namespace DatEditorVDGrid
             foreach (var k in formattingKeysToPreserve)
             {
                 if (data.ContainsKey(k))
-                    _formattingProps[k] = DatService.GetFullProperty(data, k) ?? "";
+                    _options.FormattingProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
             // Preserve MaskedCols keys
@@ -787,7 +751,7 @@ namespace DatEditorVDGrid
             foreach (var k in maskedKeys)
             {
                 if (data.ContainsKey(k))
-                    _maskedProps[k] = DatService.GetFullProperty(data, k) ?? "";
+                    _options.MaskedProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
             // Preserve ellipsis extra properties
@@ -807,7 +771,7 @@ namespace DatEditorVDGrid
             foreach (var k in ellipsisExtraKeys)
             {
                 if (data.ContainsKey(k))
-                    _ellipsisExtraProps[k] = DatService.GetFullProperty(data, k) ?? "";
+                    _options.EllipsisExtraProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
             // Preserve SubTotals keys
@@ -825,7 +789,7 @@ namespace DatEditorVDGrid
             foreach (var k in subTotalsKeys)
             {
                 if (data.ContainsKey(k))
-                    _subTotalsProps[k] = DatService.GetFullProperty(data, k) ?? "";
+                    _options.SubTotalsProps[k] = DatService.GetFullProperty(data, k) ?? "";
             }
 
             // From+Joins se muestra en richSelect (control independiente)
@@ -897,9 +861,9 @@ namespace DatEditorVDGrid
             // -> ALSO populate per-row column so values are visible/editable in the grid.
             if (ellipsisColsToShowTokens.Length == 1 && ellipsisColsToShowTokens[0].Contains(","))
             {
-                _globalEllipsisColsToShow = ellipsisColsToShowTokens[0];
+                _options.GlobalEllipsisColsToShow = ellipsisColsToShowTokens[0];
                 // try to split by commas and assign each token to the corresponding row's cell
-                var csvTokens = _globalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
+                var csvTokens = _options.GlobalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
                 // We'll still clear ellipsisColsToShowTokens so the per-row ~-joined value will be taken from cells
                 ellipsisColsToShowTokens = new string[0];
             }
@@ -917,14 +881,14 @@ namespace DatEditorVDGrid
 
             // preserve full original strings for fallback
             if (!string.IsNullOrEmpty(fullEllipsisColsToAsign))
-                _fullEllipsisColsToAsign = fullEllipsisColsToAsign;
+                _options.FullEllipsisColsToAsign = fullEllipsisColsToAsign;
             if (!string.IsNullOrEmpty(fullEllipsisColsToAlias))
-                _fullEllipsisColsToAlias = fullEllipsisColsToAlias;
+                _options.FullEllipsisColsToAlias = fullEllipsisColsToAlias;
 
             // If we had a single global CSV for EllipsisColsToShowfrmSearch, create csvTokens now so we can assign per-row
             string[] ellipsisColsToShowGlobalCsvTokens = null;
-            if (!string.IsNullOrEmpty(_globalEllipsisColsToShow))
-                ellipsisColsToShowGlobalCsvTokens = _globalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
+            if (!string.IsNullOrEmpty(_options.GlobalEllipsisColsToShow))
+                ellipsisColsToShowGlobalCsvTokens = _options.GlobalEllipsisColsToShow.Split(new[] { ',' }, StringSplitOptions.None);
 
             // NEW: load Validate properties
             var fullColsSqlValid = data.ContainsKey("ColsSqlValid") ? DatService.GetFullProperty(data, "ColsSqlValid") : "";
@@ -938,13 +902,13 @@ namespace DatEditorVDGrid
                 : fullColsToAsignValues.Split(new[] { '~' }, StringSplitOptions.None);
 
             // NEW: load InsNewRowAfterCols tokens (behavior) to mark per-row checkbox
-            var fullInsNewRowAfter = _behaviorProps.ContainsKey("InsNewRowAfterCols") ? _behaviorProps["InsNewRowAfterCols"] : "";
+            var fullInsNewRowAfter = _options.BehaviorProps.ContainsKey("InsNewRowAfterCols") ? _options.BehaviorProps["InsNewRowAfterCols"] : "";
             var insNewRowTokens = string.IsNullOrWhiteSpace(fullInsNewRowAfter)
                 ? new string[0]
                 : fullInsNewRowAfter.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()).ToArray();
 
             // NEW: parse SubTotalsSummary first token (comma list) and use it to mark checkboxes.
-            var fullSubTotalsSummary = _subTotalsProps.ContainsKey("SubTotalsSummary") ? _subTotalsProps["SubTotalsSummary"] : "";
+            var fullSubTotalsSummary = _options.SubTotalsProps.ContainsKey("SubTotalsSummary") ? _options.SubTotalsProps["SubTotalsSummary"] : "";
             var subTotalsSummaryTokens = string.IsNullOrEmpty(fullSubTotalsSummary)
                 ? new string[0]
                 : fullSubTotalsSummary.Split(new[] { '~' }, StringSplitOptions.None);
@@ -1062,14 +1026,14 @@ namespace DatEditorVDGrid
                 // Mark InsNewRowAfter checkbox if this field is present in imported InsNewRowAfterCols
                 bool insMark = insNewRowTokens.Any(t =>
                     string.Equals(t, alias, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(t, StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
+                    string.Equals(t, DatOptions.StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
                 dgvColumns.Rows[rowIndex].Cells["InsNewRowAfter"].Value = insMark;
 
                 // Mark SubTotal checkbox ONLY if this field is listed in SubTotalsSummary first token
                 bool subTotalMark = false;
                 if (subTotalsNameSet.Count > 0)
                 {
-                    var stripped = StripTablePrefix(campo);
+                    var stripped = DatOptions.StripTablePrefix(campo);
                     if (!string.IsNullOrEmpty(alias) && subTotalsNameSet.Contains(alias))
                         subTotalMark = true;
                     else if (!string.IsNullOrEmpty(stripped) && subTotalsNameSet.Contains(stripped))
@@ -1080,7 +1044,7 @@ namespace DatEditorVDGrid
                 // If this column name (alias or campo without table prefix) is listed in ColsToEdit => mark Editable
                 bool shouldEdit = colsToEditTokens.Any(token =>
                     string.Equals(token, alias, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(token, StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
+                    string.Equals(token, DatOptions.StripTablePrefix(campo), StringComparison.OrdinalIgnoreCase));
 
                 dgvColumns.Rows[rowIndex].Cells["Editable"].Value = shouldEdit;
             }
@@ -1149,7 +1113,7 @@ namespace DatEditorVDGrid
                     var headerVal = headerCell?.Value?.ToString();
                     if (string.IsNullOrWhiteSpace(headerVal))
                     {
-                        headerCell.Value = StripTablePrefix(campoRaw);
+                        headerCell.Value = DatOptions.StripTablePrefix(campoRaw);
                         filled++;
                     }
                 }

@@ -64,7 +64,7 @@ namespace DatEditorVDGrid.Helpers
         public static List<string> GetWrappedChunks(string key, string value)
         {
             value = value ?? "";
-            int maxLine = 255;
+            int maxLine = 250;
             int prefixLength = key.Length + 1;
             int chunkMax = Math.Max(1, maxLine - prefixLength);
             return SplitSqlIntoLines(value, chunkMax);
