@@ -406,7 +406,6 @@ namespace DatEditorVDGrid
             this.lblStatus.Size = new System.Drawing.Size(0, 13);
             this.lblStatus.TabIndex = 6;
             this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            this.lblStatus.Click += new System.EventHandler(this.lblStatus_Click);
             // 
             // Form1
             // 
