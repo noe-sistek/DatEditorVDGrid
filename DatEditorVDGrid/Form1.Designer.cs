@@ -31,9 +31,16 @@ namespace DatEditorVDGrid
         /// </summary>
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle5 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.dgvColumns = new System.Windows.Forms.DataGridView();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.btnFillValues = new System.Windows.Forms.Button();
+            this.btnLoadDat = new System.Windows.Forms.Button();
+            this.btnValidate = new System.Windows.Forms.Button();
+            this.btnGenerate = new System.Windows.Forms.Button();
+            this.btnAddRow = new System.Windows.Forms.Button();
             this.panel2 = new System.Windows.Forms.Panel();
             this.richSelect = new System.Windows.Forms.RichTextBox();
             this.txtForeignAlias = new System.Windows.Forms.TextBox();
@@ -58,17 +65,10 @@ namespace DatEditorVDGrid
             this.lblWhere = new System.Windows.Forms.Label();
             this.txtWhereSql = new System.Windows.Forms.TextBox();
             this.richSalida = new System.Windows.Forms.RichTextBox();
-            this.btnAddRow = new System.Windows.Forms.Button();
-            this.btnGenerate = new System.Windows.Forms.Button();
-            this.btnValidate = new System.Windows.Forms.Button();
-            this.btnLoadDat = new System.Windows.Forms.Button();
-            this.btnFillValues = new System.Windows.Forms.Button();
-            this.panel1 = new System.Windows.Forms.Panel();
-            this.lblStatus = new System.Windows.Forms.Label();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvColumns)).BeginInit();
-            this.panel2.SuspendLayout();
             this.panel1.SuspendLayout();
+            this.panel2.SuspendLayout();
             this.SuspendLayout();
             // 
             // tableLayoutPanel1
@@ -95,20 +95,93 @@ namespace DatEditorVDGrid
             // 
             this.dgvColumns.AllowUserToOrderColumns = true;
             this.dgvColumns.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle5.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle5.BackColor = System.Drawing.SystemColors.ButtonFace;
-            dataGridViewCellStyle5.Font = new System.Drawing.Font("Cascadia Mono", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            dataGridViewCellStyle5.ForeColor = System.Drawing.SystemColors.ControlText;
-            dataGridViewCellStyle5.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle5.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle5.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.dgvColumns.DefaultCellStyle = dataGridViewCellStyle5;
+            dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.ButtonFace;
+            dataGridViewCellStyle1.Font = new System.Drawing.Font("Cascadia Mono", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.dgvColumns.DefaultCellStyle = dataGridViewCellStyle1;
             this.dgvColumns.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dgvColumns.Location = new System.Drawing.Point(3, 153);
             this.dgvColumns.Name = "dgvColumns";
             this.dgvColumns.Size = new System.Drawing.Size(1222, 394);
             this.dgvColumns.TabIndex = 0;
             this.dgvColumns.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgvColumns_CellContentClick);
+            // 
+            // panel1
+            // 
+            this.panel1.Controls.Add(this.lblStatus);
+            this.panel1.Controls.Add(this.btnFillValues);
+            this.panel1.Controls.Add(this.btnLoadDat);
+            this.panel1.Controls.Add(this.btnValidate);
+            this.panel1.Controls.Add(this.btnGenerate);
+            this.panel1.Controls.Add(this.btnAddRow);
+            this.panel1.Location = new System.Drawing.Point(3, 553);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(1053, 34);
+            this.panel1.TabIndex = 5;
+            // 
+            // lblStatus
+            // 
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Dock = System.Windows.Forms.DockStyle.Right;
+            this.lblStatus.Location = new System.Drawing.Point(1053, 0);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(0, 13);
+            this.lblStatus.TabIndex = 6;
+            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            // 
+            // btnFillValues
+            // 
+            this.btnFillValues.Location = new System.Drawing.Point(334, 8);
+            this.btnFillValues.Name = "btnFillValues";
+            this.btnFillValues.Size = new System.Drawing.Size(75, 23);
+            this.btnFillValues.TabIndex = 5;
+            this.btnFillValues.Text = "LLENAR";
+            this.btnFillValues.UseVisualStyleBackColor = true;
+            this.btnFillValues.Click += new System.EventHandler(this.btnFillValues_Click);
+            // 
+            // btnLoadDat
+            // 
+            this.btnLoadDat.Location = new System.Drawing.Point(253, 8);
+            this.btnLoadDat.Name = "btnLoadDat";
+            this.btnLoadDat.Size = new System.Drawing.Size(75, 23);
+            this.btnLoadDat.TabIndex = 4;
+            this.btnLoadDat.Text = "Cargar .dat";
+            this.btnLoadDat.UseVisualStyleBackColor = true;
+            this.btnLoadDat.Click += new System.EventHandler(this.btnLoadDat_Click);
+            // 
+            // btnValidate
+            // 
+            this.btnValidate.Location = new System.Drawing.Point(172, 8);
+            this.btnValidate.Name = "btnValidate";
+            this.btnValidate.Size = new System.Drawing.Size(75, 23);
+            this.btnValidate.TabIndex = 3;
+            this.btnValidate.Text = "Validar";
+            this.btnValidate.UseVisualStyleBackColor = true;
+            this.btnValidate.Click += new System.EventHandler(this.btnValidate_Click);
+            // 
+            // btnGenerate
+            // 
+            this.btnGenerate.Location = new System.Drawing.Point(91, 8);
+            this.btnGenerate.Name = "btnGenerate";
+            this.btnGenerate.Size = new System.Drawing.Size(75, 23);
+            this.btnGenerate.TabIndex = 2;
+            this.btnGenerate.Text = "Generar .dat";
+            this.btnGenerate.UseVisualStyleBackColor = true;
+            this.btnGenerate.Click += new System.EventHandler(this.btnGenerate_Click);
+            // 
+            // btnAddRow
+            // 
+            this.btnAddRow.Location = new System.Drawing.Point(10, 8);
+            this.btnAddRow.Name = "btnAddRow";
+            this.btnAddRow.Size = new System.Drawing.Size(75, 23);
+            this.btnAddRow.TabIndex = 1;
+            this.btnAddRow.Text = "Agregar Fila";
+            this.btnAddRow.UseVisualStyleBackColor = true;
+            this.btnAddRow.Click += new System.EventHandler(this.btnAddRow_Click);
             // 
             // panel2
             // 
@@ -334,79 +407,6 @@ namespace DatEditorVDGrid
             this.richSalida.Text = "";
             this.richSalida.WordWrap = false;
             // 
-            // btnAddRow
-            // 
-            this.btnAddRow.Location = new System.Drawing.Point(10, 8);
-            this.btnAddRow.Name = "btnAddRow";
-            this.btnAddRow.Size = new System.Drawing.Size(75, 23);
-            this.btnAddRow.TabIndex = 1;
-            this.btnAddRow.Text = "Agregar Fila";
-            this.btnAddRow.UseVisualStyleBackColor = true;
-            this.btnAddRow.Click += new System.EventHandler(this.btnAddRow_Click);
-            // 
-            // btnGenerate
-            // 
-            this.btnGenerate.Location = new System.Drawing.Point(91, 8);
-            this.btnGenerate.Name = "btnGenerate";
-            this.btnGenerate.Size = new System.Drawing.Size(75, 23);
-            this.btnGenerate.TabIndex = 2;
-            this.btnGenerate.Text = "Generar .dat";
-            this.btnGenerate.UseVisualStyleBackColor = true;
-            this.btnGenerate.Click += new System.EventHandler(this.btnGenerate_Click);
-            // 
-            // btnValidate
-            // 
-            this.btnValidate.Location = new System.Drawing.Point(172, 8);
-            this.btnValidate.Name = "btnValidate";
-            this.btnValidate.Size = new System.Drawing.Size(75, 23);
-            this.btnValidate.TabIndex = 3;
-            this.btnValidate.Text = "Validar";
-            this.btnValidate.UseVisualStyleBackColor = true;
-            this.btnValidate.Click += new System.EventHandler(this.btnValidate_Click);
-            // 
-            // btnLoadDat
-            // 
-            this.btnLoadDat.Location = new System.Drawing.Point(253, 8);
-            this.btnLoadDat.Name = "btnLoadDat";
-            this.btnLoadDat.Size = new System.Drawing.Size(75, 23);
-            this.btnLoadDat.TabIndex = 4;
-            this.btnLoadDat.Text = "Cargar .dat";
-            this.btnLoadDat.UseVisualStyleBackColor = true;
-            this.btnLoadDat.Click += new System.EventHandler(this.btnLoadDat_Click);
-            // 
-            // btnFillValues
-            // 
-            this.btnFillValues.Location = new System.Drawing.Point(334, 8);
-            this.btnFillValues.Name = "btnFillValues";
-            this.btnFillValues.Size = new System.Drawing.Size(75, 23);
-            this.btnFillValues.TabIndex = 5;
-            this.btnFillValues.Text = "LLENAR";
-            this.btnFillValues.UseVisualStyleBackColor = true;
-            this.btnFillValues.Click += new System.EventHandler(this.btnFillValues_Click);
-            // 
-            // panel1
-            // 
-            this.panel1.Controls.Add(this.lblStatus);
-            this.panel1.Controls.Add(this.btnFillValues);
-            this.panel1.Controls.Add(this.btnLoadDat);
-            this.panel1.Controls.Add(this.btnValidate);
-            this.panel1.Controls.Add(this.btnGenerate);
-            this.panel1.Controls.Add(this.btnAddRow);
-            this.panel1.Location = new System.Drawing.Point(3, 553);
-            this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(1053, 34);
-            this.panel1.TabIndex = 5;
-            // 
-            // lblStatus
-            // 
-            this.lblStatus.AutoSize = true;
-            this.lblStatus.Dock = System.Windows.Forms.DockStyle.Right;
-            this.lblStatus.Location = new System.Drawing.Point(1053, 0);
-            this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(0, 13);
-            this.lblStatus.TabIndex = 6;
-            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -417,10 +417,10 @@ namespace DatEditorVDGrid
             this.Text = "Form1";
             this.tableLayoutPanel1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.dgvColumns)).EndInit();
-            this.panel2.ResumeLayout(false);
-            this.panel2.PerformLayout();
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
+            this.panel2.ResumeLayout(false);
+            this.panel2.PerformLayout();
             this.ResumeLayout(false);
 
         }

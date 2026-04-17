@@ -187,6 +187,11 @@ namespace DatEditorVDGrid
                     DataGridHelper.HandleEllipsisChange(dgvColumns, ev.RowIndex);
                 }
             };
+
+            dgvColumns.Columns["Pos"].Frozen = true;
+            dgvColumns.Columns["CampoSQL"].Frozen = true;
+            dgvColumns.Columns["Pos"].DefaultCellStyle.BackColor = Color.White;
+            dgvColumns.Columns["CampoSQL"].DefaultCellStyle.BackColor = Color.White;
             //TooltipHelper.AttachTooltips(this);
             // Inicializar ToolTip
             _tt = new ToolTip();
