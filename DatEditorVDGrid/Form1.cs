@@ -1080,7 +1080,19 @@ namespace DatEditorVDGrid
                 col.Width = Math.Max(col.MinimumWidth, col.Width + padding);
                 col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             }
+            // set status text and resize label to fit filename
+            lblStatus.Text = "ArchivoImportado: " + ofd.SafeFileName;
 
+            // Preferible: calcular ancho exacto y limitarlo al ancho disponible del formulario
+            var measured = TextRenderer.MeasureText(lblStatus.Text, lblStatus.Font);
+            int paddinglbl = 2;
+            int maxAllowed = Math.Max(100, this.ClientSize.Width - lblStatus.Left - paddinglbl);
+            lblStatus.AutoSize = false;
+            lblStatus.Width = Math.Min(measured.Width + paddinglbl, maxAllowed);
+
+            // Si no cabe, usar elipsis para indicar recorte
+            lblStatus.AutoEllipsis = true;
+            lblStatus.Refresh();
             MessageBox.Show("DAT cargado correctamente");
         }
 
@@ -1195,5 +1207,6 @@ namespace DatEditorVDGrid
         {
 
         }
+
     }//Form
 }//namespace
