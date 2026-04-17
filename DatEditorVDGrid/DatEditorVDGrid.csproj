@@ -75,6 +75,7 @@
     <Compile Include="Services\SqlParserService.cs" />
     <Compile Include="UIHelpers\DataGridHelper.cs" />
     <Compile Include="UIHelpers\RichTextHelper.cs" />
+    <Compile Include="UIHelpers\TooltipHelper.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
     </EmbeddedResource>

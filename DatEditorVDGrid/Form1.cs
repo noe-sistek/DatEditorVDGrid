@@ -183,6 +183,7 @@ namespace DatEditorVDGrid
                     DataGridHelper.HandleEllipsisChange(dgvColumns, ev.RowIndex);
                 }
             };
+            //TooltipHelper.AttachTooltips(this);
         }
 
 
@@ -694,25 +695,25 @@ namespace DatEditorVDGrid
             // Preserve Behavior keys found in the imported .dat so we can write them back unchanged later
             string[] behaviorKeysToPreserve = new[]
             {
-                "UpperCaseConvert",
-                "AllowEnterToTab",
-                "EnterActionNextCol",
-                "EnterctionNextRow",
-                "GoLastRowOnLoad",
-                "ShowColToolTips",
-                "DoubleClickAction",
-                "ReturnToCallerForm",
-                "CallOtherForm",
-                "FormToCall",
-                "FieldToSend",
-                "NewRowColor",
-                "ModRowColor",
-                "DelRowColor",
-                "AddAutomatically",
-                "BKColorByRow",
-                "FKColorNegativeValues",
-                "InsNewRowAfterCols"
-            };
+        "UpperCaseConvert",
+        "AllowEnterToTab",
+        "EnterActionNextCol",
+        "EnterctionNextRow",
+        "GoLastRowOnLoad",
+        "ShowColToolTips",
+        "DoubleClickAction",
+        "ReturnToCallerForm",
+        "CallOtherForm",
+        "FormToCall",
+        "FieldToSend",
+        "NewRowColor",
+        "ModRowColor",
+        "DelRowColor",
+        "AddAutomatically",
+        "BKColorByRow",
+        "FKColorNegativeValues",
+        "InsNewRowAfterCols"
+    };
             foreach (var k in behaviorKeysToPreserve)
             {
                 if (data.ContainsKey(k))
@@ -722,20 +723,20 @@ namespace DatEditorVDGrid
             // Preserve Formatting keys that are NOT per-column (we already handle Headers/Widths/ColsToEdit/FormatStrings from grid)
             string[] formattingKeysToPreserve = new[]
             {
-                "Height",
-                "ResizeCols",
-                "ResizeRows",
-                "MoveCols",
-                "ExplorerBar",
-                "AutoSearch",
-                "SelectFullRow",
-                "MergeCells",
-                "OutlineBar",
-                "BlankLinesOnEdit",
-                "FrozenRows",
-                "FrozenCols",
-                "WordWrap"
-            };
+        "Height",
+        "ResizeCols",
+        "ResizeRows",
+        "MoveCols",
+        "ExplorerBar",
+        "AutoSearch",
+        "SelectFullRow",
+        "MergeCells",
+        "OutlineBar",
+        "BlankLinesOnEdit",
+        "FrozenRows",
+        "FrozenCols",
+        "WordWrap"
+    };
             foreach (var k in formattingKeysToPreserve)
             {
                 if (data.ContainsKey(k))
@@ -745,9 +746,9 @@ namespace DatEditorVDGrid
             // Preserve MaskedCols keys
             string[] maskedKeys = new[]
             {
-                "ColComboSqlSources",
-                "ColComboEditables"
-            };
+        "ColComboSqlSources",
+        "ColComboEditables"
+    };
             foreach (var k in maskedKeys)
             {
                 if (data.ContainsKey(k))
@@ -757,17 +758,17 @@ namespace DatEditorVDGrid
             // Preserve ellipsis extra properties
             string[] ellipsisExtraKeys = new[]
             {
-                "EllipsisColInvokeColor",
-                "EllipsisColInvokeFont",
-                "EllipsisColsNewFields",
-                "EllipsisColsNewCaption",
-                "EllipsisColsNewDataTypes",
-                "EllipsisColsNewTableNames",
-                "EllipsisColInvokeOpen",
-                "EllipsisColOpenFilters",
-                "EllipsisColInvokeBrowse",
-                "EllipsisColShellExec"
-            };
+        "EllipsisColInvokeColor",
+        "EllipsisColInvokeFont",
+        "EllipsisColsNewFields",
+        "EllipsisColsNewCaption",
+        "EllipsisColsNewDataTypes",
+        "EllipsisColsNewTableNames",
+        "EllipsisColInvokeOpen",
+        "EllipsisColOpenFilters",
+        "EllipsisColInvokeBrowse",
+        "EllipsisColShellExec"
+    };
             foreach (var k in ellipsisExtraKeys)
             {
                 if (data.ContainsKey(k))
@@ -777,15 +778,15 @@ namespace DatEditorVDGrid
             // Preserve SubTotals keys
             string[] subTotalsKeys = new[]
             {
-                "Totales",
-                "MultipleSubTotals",
-                "SubTotalsGroups",
-                "SubTotalsSummary",
-                "SubTotalBkColors",
-                "SubTotalCaptions",
-                "SubTotalsEditable",
-                "DetailEditable"
-            };
+        "Totales",
+        "MultipleSubTotals",
+        "SubTotalsGroups",
+        "SubTotalsSummary",
+        "SubTotalBkColors",
+        "SubTotalCaptions",
+        "SubTotalsEditable",
+        "DetailEditable"
+    };
             foreach (var k in subTotalsKeys)
             {
                 if (data.ContainsKey(k))
@@ -1049,6 +1050,37 @@ namespace DatEditorVDGrid
                 dgvColumns.Rows[rowIndex].Cells["Editable"].Value = shouldEdit;
             }
 
+            // Adjust selected columns to fit their content so they become narrower where possible
+            var columnsToFit = new[]
+            {
+        "Pos",
+        "DataType", // "Tipo" header -> column name is DataType
+        "Guardar",
+        "Requerido",
+        "Editable",
+        "Width",
+        "Ellipsis",
+        "Validate",
+        "InsNewRowAfter",
+        "SubTotal"
+    };
+
+            foreach (var colName in columnsToFit)
+            {
+                if (!dgvColumns.Columns.Contains(colName))
+                    continue;
+
+                var col = dgvColumns.Columns[colName];
+
+                // Resize to fit all cells (including header)
+                dgvColumns.AutoResizeColumn(col.Index, DataGridViewAutoSizeColumnMode.AllCells);
+
+                // Add a small padding so content doesn't touch cell border, then lock autosize so user can still manually resize
+                int padding = 6;
+                col.Width = Math.Max(col.MinimumWidth, col.Width + padding);
+                col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            }
+
             MessageBox.Show("DAT cargado correctamente");
         }
 
@@ -1157,6 +1189,11 @@ namespace DatEditorVDGrid
             }
 
             MessageBox.Show($"Valores por defecto agregados: {filled}", "Auto-fill", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void tableLayoutPanel1_Paint(object sender, PaintEventArgs e)
+        {
+
         }
     }//Form
 }//namespace
