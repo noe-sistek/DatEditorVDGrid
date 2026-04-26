@@ -246,5 +246,26 @@ namespace DatEditorVDGrid
 
         }
 
+        private void txtExport_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(richSalida.Text))
+            {
+                MessageBox.Show("No hay contenido para exportar.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (SaveFileDialog sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "DAT files (*.dat)|*.dat|All files (*.*)|*.*";
+                sfd.Title = "Exportar a archivo DAT";
+                sfd.DefaultExt = "dat";
+                
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    System.IO.File.WriteAllText(sfd.FileName, richSalida.Text);
+                    MessageBox.Show("Archivo exportado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+        }
     }//Form
 }//namespace

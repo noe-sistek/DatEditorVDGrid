@@ -35,6 +35,7 @@ namespace DatEditorVDGrid
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.dgvColumns = new System.Windows.Forms.DataGridView();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.txtExport = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.btnFillValues = new System.Windows.Forms.Button();
             this.btnLoadDat = new System.Windows.Forms.Button();
@@ -112,6 +113,7 @@ namespace DatEditorVDGrid
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.txtExport);
             this.panel1.Controls.Add(this.lblStatus);
             this.panel1.Controls.Add(this.btnFillValues);
             this.panel1.Controls.Add(this.btnLoadDat);
@@ -122,6 +124,16 @@ namespace DatEditorVDGrid
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(1053, 34);
             this.panel1.TabIndex = 5;
+            // 
+            // txtExport
+            // 
+            this.txtExport.Location = new System.Drawing.Point(415, 8);
+            this.txtExport.Name = "txtExport";
+            this.txtExport.Size = new System.Drawing.Size(75, 23);
+            this.txtExport.TabIndex = 7;
+            this.txtExport.Text = "EXPORTAR";
+            this.txtExport.UseVisualStyleBackColor = true;
+            this.txtExport.Click += new System.EventHandler(this.txtExport_Click);
             // 
             // lblStatus
             // 
@@ -464,6 +476,7 @@ namespace DatEditorVDGrid
         private Button btnGenerate;
         private Button btnAddRow;
         private Label lblStatus;
+        private Button txtExport;
     }
 }
 
