@@ -25,7 +25,7 @@ namespace DatEditorVDGrid
         private readonly DatOptions _options = new DatOptions();
 
         // Syntax/coloring settings for SQL keywords and output separators
-        private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS" };
+        private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS", "AND", "OR", "NOT", "LIKE", "IS", "NULL"  };
         private readonly Color _joinColor = Color.Blue;
         private readonly Color _keywordColor = Color.Green;
         private readonly Color _separatorColor = Color.Orange;

@@ -410,7 +410,7 @@ namespace DatEditorVDGrid
             // 
             this.richSalida.BackColor = System.Drawing.SystemColors.Desktop;
             this.richSalida.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.richSalida.Font = new System.Drawing.Font("Cascadia Mono", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.richSalida.Font = new System.Drawing.Font("Cascadia Mono", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.richSalida.ForeColor = System.Drawing.SystemColors.Control;
             this.richSalida.Location = new System.Drawing.Point(3, 593);
             this.richSalida.Name = "richSalida";

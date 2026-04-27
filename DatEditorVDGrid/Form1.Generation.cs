@@ -426,12 +426,8 @@ namespace DatEditorVDGrid
             // show generated .dat inside richSalida only
             richSalida.Text = sb.ToString();
 
-            // Only color separator characters (commas and tildes). Do not change background/overall forecolor here.
-            RichTextHelper.HighlightSeparators(
-                richSalida,
-                new[] { ',', '~' },
-                _separatorColor
-            );
+            // Color elements separated by commas and tildes with sequence colors, and bold headers
+            RichTextHelper.ApplyDatSyntaxHighlighting(richSalida);
         }
 
         private void btnValidate_Click(object sender, EventArgs e)
