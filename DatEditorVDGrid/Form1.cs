@@ -25,7 +25,7 @@ namespace DatEditorVDGrid
         private readonly DatOptions _options = new DatOptions();
 
         // Syntax/coloring settings for SQL keywords and output separators
-        private readonly string[] _sqlKeywords = { "FROM", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS", "AND", "OR", "NOT", "LIKE", "IS", "NULL"  };
+        private readonly string[] _sqlKeywords = { "SELECT", "FROM", "WHERE", "ORDER", "BY", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AS", "AND", "OR", "NOT", "LIKE", "IS", "NULL" };
         private readonly Color _joinColor = Color.Blue;
         private readonly Color _keywordColor = Color.Green;
         private readonly Color _separatorColor = Color.Orange;
@@ -266,6 +266,46 @@ namespace DatEditorVDGrid
                     MessageBox.Show("Archivo exportado correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
+        }
+
+        private void btnQuery_Click(object sender, EventArgs e)
+        {
+            var filas = dgvColumns.Rows
+                .Cast<DataGridViewRow>()
+                .Where(r => !string.IsNullOrWhiteSpace(r.Cells["CampoSQL"].Value?.ToString()))
+                .ToList();
+
+            if (filas.Count == 0)
+            {
+                richSalida.Text = "-- No hay campos seleccionados para la consulta.";
+                return;
+            }
+
+            var selectParts = filas.Select(row => {
+                string campo = row.Cells["CampoSQL"].Value?.ToString().Trim();
+                string alias = row.Cells["Alias"].Value?.ToString().Trim();
+                return string.IsNullOrWhiteSpace(alias) ? campo : $"{campo} AS {alias}";
+            });
+
+            richSalida.Text = DatWriterHelper.BuildFormattedQuery(
+                selectParts,
+                richSelect.Text,
+                txtWhereSql.Text,
+                txtOrderSql.Text
+            );
+
+            // Aplicar resaltado de sintaxis SQL con colores vibrantes para fondo oscuro
+            bool suppress = false;
+            string[] allKeywords = _sqlKeywords.Concat(new[] { "GROUP", "HAVING" }).ToArray();
+
+            RichTextHelper.ApplySqlKeywordHighlight(
+                richSalida,
+                allKeywords,
+                RichTextHelper.VibrantColors[2], // Azul vibrante
+                RichTextHelper.VibrantColors[3], // Amarillo vibrante
+                ref suppress,
+                true
+            );
         }
     }//Form
 }//namespace

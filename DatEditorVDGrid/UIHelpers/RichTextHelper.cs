@@ -88,25 +88,25 @@ namespace DatEditorVDGrid.UIHelpers
             rtb.DeselectAll();
         }
 
+        public static readonly Color[] VibrantColors = new Color[] {
+            ColorTranslator.FromHtml("#FF5555"), // Redish
+            ColorTranslator.FromHtml("#39FF14"), // Neon Green
+            ColorTranslator.FromHtml("#00A2FF"), // Sky Blue
+            ColorTranslator.FromHtml("#FFE600"), // Yellow
+            ColorTranslator.FromHtml("#FF00FF"), // Magenta
+            ColorTranslator.FromHtml("#00FFFF"), // Cyan
+            ColorTranslator.FromHtml("#FF8C00"), // Orange
+            ColorTranslator.FromHtml("#BA68FF"), // Purple
+            ColorTranslator.FromHtml("#A3FF00"), // Lime
+            ColorTranslator.FromHtml("#FF69B4")  // Hot Pink
+        };
+
         public static void ApplyDatSyntaxHighlighting(RichTextBox rtb)
         {
             if (rtb == null) return;
 
             int origSelStart = rtb.SelectionStart;
             int origSelLen = rtb.SelectionLength;
-
-            Color[] colors = new Color[] {
-                ColorTranslator.FromHtml("#FF5555"),
-                ColorTranslator.FromHtml("#39FF14"),
-                ColorTranslator.FromHtml("#00A2FF"),
-                ColorTranslator.FromHtml("#FFE600"),
-                ColorTranslator.FromHtml("#FF00FF"),
-                ColorTranslator.FromHtml("#00FFFF"),
-                ColorTranslator.FromHtml("#FF8C00"),
-                ColorTranslator.FromHtml("#BA68FF"),
-                ColorTranslator.FromHtml("#A3FF00"),
-                ColorTranslator.FromHtml("#FF69B4")
-            };
 
             // Remove previous formatting
             rtb.SelectAll();
@@ -155,7 +155,7 @@ namespace DatEditorVDGrid.UIHelpers
                                 if (length > 0)
                                 {
                                     rtb.Select(currentElementStart, length);
-                                    rtb.SelectionColor = colors[colorIndex % 10];
+                                    rtb.SelectionColor = VibrantColors[colorIndex % 10];
                                 }
                                 
                                 colorIndex++;
@@ -167,7 +167,7 @@ namespace DatEditorVDGrid.UIHelpers
                         if (lastLength > 0)
                         {
                             rtb.Select(currentElementStart, lastLength);
-                            rtb.SelectionColor = colors[colorIndex % 10];
+                            rtb.SelectionColor = VibrantColors[colorIndex % 10];
                         }
                         colorIndex++;
                         

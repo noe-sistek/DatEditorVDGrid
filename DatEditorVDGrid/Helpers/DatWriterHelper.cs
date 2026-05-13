@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -106,6 +106,57 @@ namespace DatEditorVDGrid.Helpers
                 else
                     sb.AppendLine($"{key}{i + 1}={chunks[i]}");
             }
+        }
+        public static string BuildFormattedQuery(IEnumerable<string> selectFields, string fromPart, string wherePart, string orderPart)
+        {
+            StringBuilder sb = new StringBuilder();
+
+            // 1. SELECT
+            if (selectFields != null && selectFields.Any())
+            {
+                string selectRaw = "SELECT " + string.Join(", ", selectFields);
+                var selectLines = SplitSqlIntoLines(selectRaw, 255);
+                foreach (var line in selectLines)
+                    sb.AppendLine(line);
+            }
+
+            // 2. FROM
+            if (!string.IsNullOrWhiteSpace(fromPart))
+            {
+                string f = fromPart.Trim();
+                if (!f.StartsWith("FROM", StringComparison.OrdinalIgnoreCase))
+                    f = "FROM " + f;
+                
+                var fromLines = SplitSqlIntoLines(f, 255);
+                foreach (var line in fromLines)
+                    sb.AppendLine(line);
+            }
+
+            // 3. WHERE
+            if (!string.IsNullOrWhiteSpace(wherePart))
+            {
+                string w = wherePart.Trim();
+                if (!w.StartsWith("WHERE", StringComparison.OrdinalIgnoreCase))
+                    w = "WHERE " + w;
+
+                var whereLines = SplitSqlIntoLines(w, 255);
+                foreach (var line in whereLines)
+                    sb.AppendLine(line);
+            }
+
+            // 4. ORDER BY
+            if (!string.IsNullOrWhiteSpace(orderPart))
+            {
+                string o = orderPart.Trim();
+                if (!o.StartsWith("ORDER BY", StringComparison.OrdinalIgnoreCase))
+                    o = "ORDER BY " + o;
+
+                var orderLines = SplitSqlIntoLines(o, 255);
+                foreach (var line in orderLines)
+                    sb.AppendLine(line);
+            }
+
+            return sb.ToString();
         }
     }
 }

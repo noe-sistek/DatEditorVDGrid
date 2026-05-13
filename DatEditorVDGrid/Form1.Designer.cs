@@ -35,6 +35,7 @@ namespace DatEditorVDGrid
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.dgvColumns = new System.Windows.Forms.DataGridView();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.btnQuery = new System.Windows.Forms.Button();
             this.txtExport = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.btnFillValues = new System.Windows.Forms.Button();
@@ -113,6 +114,7 @@ namespace DatEditorVDGrid
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.btnQuery);
             this.panel1.Controls.Add(this.txtExport);
             this.panel1.Controls.Add(this.lblStatus);
             this.panel1.Controls.Add(this.btnFillValues);
@@ -124,6 +126,16 @@ namespace DatEditorVDGrid
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(1053, 34);
             this.panel1.TabIndex = 5;
+            // 
+            // btnQuery
+            // 
+            this.btnQuery.Location = new System.Drawing.Point(496, 8);
+            this.btnQuery.Name = "btnQuery";
+            this.btnQuery.Size = new System.Drawing.Size(75, 23);
+            this.btnQuery.TabIndex = 8;
+            this.btnQuery.Text = "CONSULTA";
+            this.btnQuery.UseVisualStyleBackColor = true;
+            this.btnQuery.Click += new System.EventHandler(this.btnQuery_Click);
             // 
             // txtExport
             // 
@@ -408,7 +420,7 @@ namespace DatEditorVDGrid
             // 
             // richSalida
             // 
-            this.richSalida.BackColor = System.Drawing.SystemColors.Desktop;
+            this.richSalida.BackColor = System.Drawing.Color.Black;
             this.richSalida.Dock = System.Windows.Forms.DockStyle.Fill;
             this.richSalida.Font = new System.Drawing.Font("Cascadia Mono", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.richSalida.ForeColor = System.Drawing.SystemColors.Control;
@@ -477,6 +489,7 @@ namespace DatEditorVDGrid
         private Button btnAddRow;
         private Label lblStatus;
         private Button txtExport;
+        private Button btnQuery;
     }
 }
 
