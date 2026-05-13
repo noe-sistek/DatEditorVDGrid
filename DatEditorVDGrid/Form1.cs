@@ -307,5 +307,59 @@ namespace DatEditorVDGrid
                 true
             );
         }
+
+        private void btnQueryImport_Click(object sender, EventArgs e)
+        {
+            string sql = richSalida.Text?.Trim();
+
+            if (string.IsNullOrWhiteSpace(sql))
+            {
+                MessageBox.Show("No hay ninguna consulta en la salida para importar.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!sql.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("La consulta debe comenzar con SELECT.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var dr = MessageBox.Show("Esto limpiará la lista actual de campos. ¿Desea continuar?", "Confirmar Importación", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (dr != DialogResult.Yes) return;
+
+            try
+            {
+                SqlParserService.ParseFullQuery(sql, out List<string> selectFields, out string fromPart, out string wherePart, out string orderPart);
+
+                // Limpiar grid
+                dgvColumns.Rows.Clear();
+
+                // Poblar grid con campos
+                foreach (var fieldRaw in selectFields)
+                {
+                    SqlParserService.ParseFieldNameAndAlias(fieldRaw, out string name, out string alias);
+
+                    int rowIndex = dgvColumns.Rows.Add();
+                    var row = dgvColumns.Rows[rowIndex];
+
+                    row.Cells["Pos"].Value = rowIndex + 1;
+                    row.Cells["CampoSQL"].Value = name;
+                    row.Cells["Alias"].Value = alias;
+                    row.Cells["DataType"].Value = "C"; // Default a string
+                    row.Cells["Guardar"].Value = true; // Por defecto marcar para guardar
+                }
+
+                // Poblar otros campos
+                richSelect.Text = fromPart;
+                txtWhereSql.Text = wherePart;
+                txtOrderSql.Text = orderPart;
+
+                MessageBox.Show($"Se importaron {selectFields.Count} campos correctamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error al parsear la consulta: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
     }//Form
 }//namespace
