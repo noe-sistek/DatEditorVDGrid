@@ -5,18 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Text;
 using System.Windows.Forms;
-
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-
 namespace DatEditorVDGrid
 {
     public partial class Form1 : Form
@@ -50,7 +40,14 @@ namespace DatEditorVDGrid
             dgvColumns.ShowCellToolTips = true;
 
             // Core column order
-            dgvColumns.Columns.Add("Pos", "Pos");
+            var posColumn = new DataGridViewTextBoxColumn()
+            {
+                Name = "Pos",
+                HeaderText = "Pos",
+                ValueType = typeof(int),
+                SortMode = DataGridViewColumnSortMode.NotSortable
+            };
+            dgvColumns.Columns.Add(posColumn);
             dgvColumns.Columns.Add("CampoSQL", "Campo SQL");
             dgvColumns.Columns.Add("Alias", "Alias");
 
@@ -175,18 +172,10 @@ namespace DatEditorVDGrid
             {
                 DataGridHelper.CommitEdit(dgvColumns);
             };
-            dgvColumns.CellValueChanged += (s, ev) =>
-            {
-                if (ev.RowIndex < 0 || ev.ColumnIndex < 0)
-                    return;
 
-                var colName = dgvColumns.Columns[ev.ColumnIndex].Name;
-
-                if (colName == "Ellipsis")
-                {
-                    DataGridHelper.HandleEllipsisChange(dgvColumns, ev.RowIndex);
-                }
-            };
+            DataGridRowReorderHelper.DisableHeaderSorting(dgvColumns);
+            dgvColumns.CellValueChanged += dgvColumns_CellValueChanged;
+            DataGridRowReorderHelper.Attach(dgvColumns);
 
             dgvColumns.Columns["Pos"].Frozen = true;
             dgvColumns.Columns["CampoSQL"].Frozen = true;
@@ -207,6 +196,44 @@ namespace DatEditorVDGrid
             // Evento para tooltips dinámicos en el grid
             dgvColumns.CellToolTipTextNeeded += dgvColumns_CellToolTipTextNeeded;
         }
+
+        private void dgvColumns_CellValueChanged(object sender, DataGridViewCellEventArgs ev)
+        {
+            if (ev.RowIndex < 0 || ev.ColumnIndex < 0)
+                return;
+
+            var colName = dgvColumns.Columns[ev.ColumnIndex].Name;
+            if (colName == "Ellipsis")
+            {
+                DataGridHelper.HandleEllipsisChange(dgvColumns, ev.RowIndex);
+                return;
+            }
+
+            if (colName != "Pos")
+                return;
+
+            var row = dgvColumns.Rows[ev.RowIndex];
+            string rawValue = Convert.ToString(row.Cells["Pos"].Value);
+            if (!int.TryParse(rawValue, out int requestedPos) || requestedPos < 1)
+            {
+                DataGridRowReorderHelper.RefreshPosCells(dgvColumns);
+                return;
+            }
+
+            int totalRows = dgvColumns.Rows.Count;
+            requestedPos = Math.Min(requestedPos, totalRows);
+            int currentIndex = row.Index;
+            int targetIndex = requestedPos - 1;
+
+            if (targetIndex != currentIndex)
+            {
+                dgvColumns.Rows.RemoveAt(currentIndex);
+                dgvColumns.Rows.Insert(targetIndex, row);
+            }
+
+            DataGridRowReorderHelper.RefreshPosCells(dgvColumns);
+        }
+
         private void btnAddRow_Click(object sender, EventArgs e)
         {
             int rowIndex = dgvColumns.Rows.Add();

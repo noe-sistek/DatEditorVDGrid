@@ -31,10 +31,11 @@ namespace DatEditorVDGrid
         /// </summary>
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.dgvColumns = new System.Windows.Forms.DataGridView();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.btnQueryImport = new System.Windows.Forms.Button();
             this.btnQuery = new System.Windows.Forms.Button();
             this.txtExport = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
@@ -67,7 +68,6 @@ namespace DatEditorVDGrid
             this.lblWhere = new System.Windows.Forms.Label();
             this.txtWhereSql = new System.Windows.Forms.TextBox();
             this.richSalida = new System.Windows.Forms.RichTextBox();
-            this.btnQueryImport = new System.Windows.Forms.Button();
             this.tableLayoutPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dgvColumns)).BeginInit();
             this.panel1.SuspendLayout();
@@ -98,14 +98,14 @@ namespace DatEditorVDGrid
             // 
             this.dgvColumns.AllowUserToOrderColumns = true;
             this.dgvColumns.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle2.BackColor = System.Drawing.SystemColors.ButtonFace;
-            dataGridViewCellStyle2.Font = new System.Drawing.Font("Cascadia Mono", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            dataGridViewCellStyle2.ForeColor = System.Drawing.SystemColors.ControlText;
-            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.dgvColumns.DefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.ButtonFace;
+            dataGridViewCellStyle1.Font = new System.Drawing.Font("Cascadia Mono", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.dgvColumns.DefaultCellStyle = dataGridViewCellStyle1;
             this.dgvColumns.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dgvColumns.Location = new System.Drawing.Point(3, 153);
             this.dgvColumns.Name = "dgvColumns";
@@ -128,6 +128,16 @@ namespace DatEditorVDGrid
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(1053, 34);
             this.panel1.TabIndex = 5;
+            // 
+            // btnQueryImport
+            // 
+            this.btnQueryImport.Location = new System.Drawing.Point(755, 8);
+            this.btnQueryImport.Name = "btnQueryImport";
+            this.btnQueryImport.Size = new System.Drawing.Size(118, 23);
+            this.btnQueryImport.TabIndex = 9;
+            this.btnQueryImport.Text = "CONSULTA  ▲";
+            this.btnQueryImport.UseVisualStyleBackColor = true;
+            this.btnQueryImport.Click += new System.EventHandler(this.btnQueryImport_Click);
             // 
             // btnQuery
             // 
@@ -433,16 +443,6 @@ namespace DatEditorVDGrid
             this.richSalida.TabIndex = 7;
             this.richSalida.Text = "";
             this.richSalida.WordWrap = false;
-            // 
-            // btnQueryImport
-            // 
-            this.btnQueryImport.Location = new System.Drawing.Point(755, 8);
-            this.btnQueryImport.Name = "btnQueryImport";
-            this.btnQueryImport.Size = new System.Drawing.Size(118, 23);
-            this.btnQueryImport.TabIndex = 9;
-            this.btnQueryImport.Text = "CONSULTA  ▲";
-            this.btnQueryImport.UseVisualStyleBackColor = true;
-            this.btnQueryImport.Click += new System.EventHandler(this.btnQueryImport_Click);
             // 
             // Form1
             // 
