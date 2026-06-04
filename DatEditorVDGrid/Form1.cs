@@ -25,6 +25,7 @@ namespace DatEditorVDGrid
 
         private ToolTip _tt;
         private string _initialFilePath = null;
+        private bool _isUpdatingGrid = false;
 
         public Form1()
         {
@@ -39,6 +40,18 @@ namespace DatEditorVDGrid
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            // Enable double buffering for DataGridView to eliminate flickering on scroll/paint
+            typeof(DataGridView).InvokeMember(
+                "DoubleBuffered",
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.SetProperty,
+                null,
+                dgvColumns,
+                new object[] { true }
+            );
+
+            dgvColumns.SuspendLayout();
             dgvColumns.Columns.Clear();
 
             dgvColumns.AllowUserToAddRows = false;
@@ -201,6 +214,8 @@ namespace DatEditorVDGrid
             // Evento para tooltips dinámicos en el grid
             dgvColumns.CellToolTipTextNeeded += dgvColumns_CellToolTipTextNeeded;
 
+            dgvColumns.ResumeLayout();
+
             if (!string.IsNullOrEmpty(_initialFilePath))
             {
                 btnLoadDat_Click(null, EventArgs.Empty);
@@ -209,6 +224,7 @@ namespace DatEditorVDGrid
 
         private void dgvColumns_CellValueChanged(object sender, DataGridViewCellEventArgs ev)
         {
+            if (_isUpdatingGrid) return;
             if (ev.RowIndex < 0 || ev.ColumnIndex < 0)
                 return;
 
@@ -224,33 +240,51 @@ namespace DatEditorVDGrid
 
             var row = dgvColumns.Rows[ev.RowIndex];
             string rawValue = Convert.ToString(row.Cells["Pos"].Value);
-            if (!int.TryParse(rawValue, out int requestedPos) || requestedPos < 1)
+
+            try
             {
+                _isUpdatingGrid = true;
+
+                if (!int.TryParse(rawValue, out int requestedPos) || requestedPos < 1)
+                {
+                    DataGridRowReorderHelper.RefreshPosCells(dgvColumns);
+                    return;
+                }
+
+                int totalRows = dgvColumns.Rows.Count;
+                requestedPos = Math.Min(requestedPos, totalRows);
+                int currentIndex = row.Index;
+                int targetIndex = requestedPos - 1;
+
+                if (targetIndex != currentIndex)
+                {
+                    dgvColumns.SuspendLayout();
+                    dgvColumns.Rows.RemoveAt(currentIndex);
+                    dgvColumns.Rows.Insert(targetIndex, row);
+                    dgvColumns.ResumeLayout();
+                }
+
                 DataGridRowReorderHelper.RefreshPosCells(dgvColumns);
-                return;
             }
-
-            int totalRows = dgvColumns.Rows.Count;
-            requestedPos = Math.Min(requestedPos, totalRows);
-            int currentIndex = row.Index;
-            int targetIndex = requestedPos - 1;
-
-            if (targetIndex != currentIndex)
+            finally
             {
-                dgvColumns.Rows.RemoveAt(currentIndex);
-                dgvColumns.Rows.Insert(targetIndex, row);
+                _isUpdatingGrid = false;
             }
-
-            DataGridRowReorderHelper.RefreshPosCells(dgvColumns);
         }
 
         private void btnAddRow_Click(object sender, EventArgs e)
         {
-            int rowIndex = dgvColumns.Rows.Add();
-            dgvColumns.Rows[rowIndex].Cells["Pos"].Value = rowIndex + 1;
-
-            // Leave CampoSQL empty so user fills it
-            dgvColumns.Rows[rowIndex].Cells["CampoSQL"].Value = "";
+            try
+            {
+                _isUpdatingGrid = true;
+                int rowIndex = dgvColumns.Rows.Add();
+                dgvColumns.Rows[rowIndex].Cells["Pos"].Value = rowIndex + 1;
+                dgvColumns.Rows[rowIndex].Cells["CampoSQL"].Value = "";
+            }
+            finally
+            {
+                _isUpdatingGrid = false;
+            }
         }
 
         private void richSelect_TextChanged(object sender, EventArgs e)

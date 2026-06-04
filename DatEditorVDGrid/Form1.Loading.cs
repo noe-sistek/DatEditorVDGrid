@@ -45,7 +45,12 @@ namespace DatEditorVDGrid
 
             var data = DatService.ParseDatFile(fileToLoad);
 
-            dgvColumns.Rows.Clear();
+            try
+            {
+                _isUpdatingGrid = true;
+                dgvColumns.SuspendLayout();
+
+                dgvColumns.Rows.Clear();
 
             if (!data.ContainsKey("SourceSql"))
             {
@@ -494,6 +499,12 @@ namespace DatEditorVDGrid
             // Si no cabe, usar elipsis para indicar recorte
             lblStatus.AutoEllipsis = true;
             lblStatus.Refresh();
+            }
+            finally
+            {
+                _isUpdatingGrid = false;
+                dgvColumns.ResumeLayout();
+            }
         }
 
     }//Form
