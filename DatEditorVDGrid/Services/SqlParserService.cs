@@ -13,12 +13,59 @@ namespace DatEditorVDGrid.Services
             selectPart = fullSql;
             fromPart = "";
 
-            var lower = (fullSql ?? "").ToLower();
-            int idx = lower.IndexOf(" from ");
-            if (idx >= 0)
+            if (string.IsNullOrEmpty(fullSql))
+                return;
+
+            int parenLevel = 0;
+            bool inString = false;
+            int length = fullSql.Length;
+
+            for (int i = 0; i < length; i++)
             {
-                selectPart = fullSql.Substring(0, idx);
-                fromPart = fullSql.Substring(idx + 1).Trim();
+                char c = fullSql[i];
+
+                if (c == '\'')
+                {
+                    if (inString)
+                    {
+                        if (i + 1 < length && fullSql[i + 1] == '\'')
+                        {
+                            i++; // skip escaped quote
+                            continue;
+                        }
+                        else
+                        {
+                            inString = false;
+                        }
+                    }
+                    else
+                    {
+                        inString = true;
+                    }
+                }
+
+                if (!inString)
+                {
+                    if (c == '(') parenLevel++;
+                    if (c == ')') parenLevel--;
+
+                    // Look for "FROM" at parenLevel == 0
+                    if (parenLevel == 0 && i + 4 <= length)
+                    {
+                        if (string.Compare(fullSql, i, "FROM", 0, 4, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            bool prevOk = i == 0 || char.IsWhiteSpace(fullSql[i - 1]);
+                            bool nextOk = i + 4 == length || char.IsWhiteSpace(fullSql[i + 4]);
+
+                            if (prevOk && nextOk)
+                            {
+                                selectPart = fullSql.Substring(0, i);
+                                fromPart = fullSql.Substring(i).Trim();
+                                return;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -26,14 +73,45 @@ namespace DatEditorVDGrid.Services
         {
             var result = new List<string>();
             int parenLevel = 0;
+            int bracketLevel = 0;
+            bool inString = false;
             var current = new StringBuilder();
 
-            foreach (char c in input)
+            for (int i = 0; i < input.Length; i++)
             {
-                if (c == '(') parenLevel++;
-                if (c == ')') parenLevel--;
+                char c = input[i];
 
-                if (c == ',' && parenLevel == 0)
+                if (c == '\'')
+                {
+                    if (inString)
+                    {
+                        if (i + 1 < input.Length && input[i + 1] == '\'')
+                        {
+                            current.Append('\'');
+                            current.Append('\'');
+                            i++; // skip escaped quote
+                            continue;
+                        }
+                        else
+                        {
+                            inString = false;
+                        }
+                    }
+                    else
+                    {
+                        inString = true;
+                    }
+                }
+
+                if (!inString)
+                {
+                    if (c == '(') parenLevel++;
+                    if (c == ')') parenLevel--;
+                    if (c == '[') bracketLevel++;
+                    if (c == ']') bracketLevel--;
+                }
+
+                if (c == ',' && parenLevel == 0 && bracketLevel == 0 && !inString)
                 {
                     result.Add(current.ToString());
                     current.Clear();
@@ -127,49 +205,125 @@ namespace DatEditorVDGrid.Services
 
             if (string.IsNullOrWhiteSpace(sql)) return;
 
-            // Normalize spaces and remove newlines for easier regex/index matching
-            string normalized = Regex.Replace(sql, @"\s+", " ").Trim();
+            string normalized = sql.Trim();
+            int length = normalized.Length;
+            int parenLevel = 0;
+            bool inString = false;
 
-            int selectIdx = normalized.IndexOf("SELECT ", StringComparison.OrdinalIgnoreCase);
-            int fromIdx = normalized.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
-            int whereIdx = normalized.IndexOf(" WHERE ", StringComparison.OrdinalIgnoreCase);
-            int orderIdx = normalized.IndexOf(" ORDER BY ", StringComparison.OrdinalIgnoreCase);
+            int selectStart = -1;
+            int fromStart = -1;
+            int whereStart = -1;
+            int orderStart = -1;
 
-            // 1. SELECT
-            if (selectIdx >= 0)
+            // First, find the indices of the keywords at the outer level (parenLevel == 0)
+            for (int i = 0; i < length; i++)
             {
-                int start = selectIdx + 7;
-                int end = (fromIdx >= 0) ? fromIdx : 
-                          (whereIdx >= 0) ? whereIdx : 
-                          (orderIdx >= 0) ? orderIdx : normalized.Length;
-                
+                char c = normalized[i];
+
+                if (c == '\'')
+                {
+                    if (inString)
+                    {
+                        if (i + 1 < length && normalized[i + 1] == '\'')
+                        {
+                            i++; // skip escaped quote
+                            continue;
+                        }
+                        else
+                        {
+                            inString = false;
+                        }
+                    }
+                    else
+                    {
+                        inString = true;
+                    }
+                }
+
+                if (!inString)
+                {
+                    if (c == '(') parenLevel++;
+                    if (c == ')') parenLevel--;
+
+                    if (parenLevel == 0)
+                    {
+                        // Check SELECT
+                        if (selectStart == -1 && i + 6 <= length && string.Compare(normalized, i, "SELECT", 0, 6, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            if (i == 0 || char.IsWhiteSpace(normalized[i - 1]))
+                            {
+                                if (i + 6 == length || char.IsWhiteSpace(normalized[i + 6]))
+                                {
+                                    selectStart = i;
+                                }
+                            }
+                        }
+                        // Check FROM
+                        else if (fromStart == -1 && i + 4 <= length && string.Compare(normalized, i, "FROM", 0, 4, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            if (i == 0 || char.IsWhiteSpace(normalized[i - 1]))
+                            {
+                                if (i + 4 == length || char.IsWhiteSpace(normalized[i + 4]))
+                                {
+                                    fromStart = i;
+                                }
+                            }
+                        }
+                        // Check WHERE
+                        else if (whereStart == -1 && i + 5 <= length && string.Compare(normalized, i, "WHERE", 0, 5, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            if (i == 0 || char.IsWhiteSpace(normalized[i - 1]))
+                            {
+                                if (i + 5 == length || char.IsWhiteSpace(normalized[i + 5]))
+                                {
+                                    whereStart = i;
+                                }
+                            }
+                        }
+                        // Check ORDER BY
+                        else if (orderStart == -1 && i + 8 <= length && string.Compare(normalized, i, "ORDER BY", 0, 8, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            if (i == 0 || char.IsWhiteSpace(normalized[i - 1]))
+                            {
+                                if (i + 8 == length || char.IsWhiteSpace(normalized[i + 8]))
+                                {
+                                    orderStart = i;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Now slice the parts
+            if (selectStart >= 0)
+            {
+                int start = selectStart + 6;
+                int end = (fromStart >= 0) ? fromStart :
+                          (whereStart >= 0) ? whereStart :
+                          (orderStart >= 0) ? orderStart : length;
                 string selectText = normalized.Substring(start, end - start).Trim();
                 selectFields = SplitSqlColumns(selectText);
             }
 
-            // 2. FROM
-            if (fromIdx >= 0)
+            if (fromStart >= 0)
             {
-                int start = fromIdx + 6;
-                int end = (whereIdx >= 0) ? whereIdx : 
-                          (orderIdx >= 0) ? orderIdx : normalized.Length;
-                
-                fromPart = "FROM " + normalized.Substring(start, end - start).Trim();
+                int start = fromStart;
+                int end = (whereStart >= 0) ? whereStart :
+                          (orderStart >= 0) ? orderStart : length;
+                fromPart = normalized.Substring(start, end - start).Trim();
             }
 
-            // 3. WHERE
-            if (whereIdx >= 0)
+            if (whereStart >= 0)
             {
-                int start = whereIdx + 7;
-                int end = (orderIdx >= 0) ? orderIdx : normalized.Length;
-                
+                int start = whereStart + 5;
+                int end = (orderStart >= 0) ? orderStart : length;
                 wherePart = normalized.Substring(start, end - start).Trim();
             }
 
-            // 4. ORDER BY
-            if (orderIdx >= 0)
+            if (orderStart >= 0)
             {
-                int start = orderIdx + 10;
+                int start = orderStart + 8;
                 orderPart = normalized.Substring(start).Trim();
             }
         }

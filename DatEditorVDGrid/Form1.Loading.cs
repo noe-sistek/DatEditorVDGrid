@@ -23,13 +23,27 @@ namespace DatEditorVDGrid
     {
         private void btnLoadDat_Click(object sender, EventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog();
-            ofd.Filter = "DAT files (*.dat)|*.dat";
+            string fileToLoad = null;
+            if (!string.IsNullOrEmpty(_initialFilePath) && System.IO.File.Exists(_initialFilePath))
+            {
+                fileToLoad = _initialFilePath;
+                _initialFilePath = null; // Clear it so subsequent manual clicks open the dialog
+            }
+            else
+            {
+                _initialFilePath = null; // Clear if it was an invalid path
+                using (OpenFileDialog ofd = new OpenFileDialog())
+                {
+                    ofd.Filter = "DAT files (*.dat)|*.dat";
 
-            if (ofd.ShowDialog() != DialogResult.OK)
-                return;
+                    if (ofd.ShowDialog() != DialogResult.OK)
+                        return;
 
-            var data = DatService.ParseDatFile(ofd.FileName);
+                    fileToLoad = ofd.FileName;
+                }
+            }
+
+            var data = DatService.ParseDatFile(fileToLoad);
 
             dgvColumns.Rows.Clear();
 
@@ -317,10 +331,7 @@ namespace DatEditorVDGrid
 
             for (int i = 0; i < campos.Count; i++)
             {
-                var parts = campos[i].Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-                string campo = parts[0];
-                string alias = parts.Length > 1 ? parts[1] : "";
+                SqlParserService.ParseFieldNameAndAlias(campos[i], out string campo, out string alias);
 
                 int rowIndex = dgvColumns.Rows.Add();
 
@@ -471,7 +482,7 @@ namespace DatEditorVDGrid
                 col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             }
             // set status text and resize label to fit filename
-            lblStatus.Text = "ArchivoImportado: " + ofd.SafeFileName;
+            lblStatus.Text = "ArchivoImportado: " + System.IO.Path.GetFileName(fileToLoad);
 
             // Preferible: calcular ancho exacto y limitarlo al ancho disponible del formulario
             var measured = TextRenderer.MeasureText(lblStatus.Text, lblStatus.Font);
@@ -483,7 +494,6 @@ namespace DatEditorVDGrid
             // Si no cabe, usar elipsis para indicar recorte
             lblStatus.AutoEllipsis = true;
             lblStatus.Refresh();
-            MessageBox.Show("DAT cargado correctamente");
         }
 
     }//Form

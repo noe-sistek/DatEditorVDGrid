@@ -127,7 +127,7 @@ namespace DatEditorVDGrid
             this.panel1.Controls.Add(this.btnAddRow);
             this.panel1.Location = new System.Drawing.Point(3, 553);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(1053, 34);
+            this.panel1.Size = new System.Drawing.Size(1132, 34);
             this.panel1.TabIndex = 5;
             // 
             // btnQueryImport
@@ -164,7 +164,7 @@ namespace DatEditorVDGrid
             // 
             this.lblStatus.AutoSize = true;
             this.lblStatus.Dock = System.Windows.Forms.DockStyle.Right;
-            this.lblStatus.Location = new System.Drawing.Point(1053, 0);
+            this.lblStatus.Location = new System.Drawing.Point(1132, 0);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(0, 13);
             this.lblStatus.TabIndex = 6;

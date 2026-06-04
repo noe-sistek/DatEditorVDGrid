@@ -24,12 +24,17 @@ namespace DatEditorVDGrid
         private bool _suppressRichSelectTextChanged = false;
 
         private ToolTip _tt;
+        private string _initialFilePath = null;
 
         public Form1()
         {
             InitializeComponent();
             this.Load += Form1_Load;
+        }
 
+        public Form1(string initialFilePath) : this()
+        {
+            _initialFilePath = initialFilePath;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -195,6 +200,11 @@ namespace DatEditorVDGrid
 
             // Evento para tooltips dinámicos en el grid
             dgvColumns.CellToolTipTextNeeded += dgvColumns_CellToolTipTextNeeded;
+
+            if (!string.IsNullOrEmpty(_initialFilePath))
+            {
+                btnLoadDat_Click(null, EventArgs.Empty);
+            }
         }
 
         private void dgvColumns_CellValueChanged(object sender, DataGridViewCellEventArgs ev)
