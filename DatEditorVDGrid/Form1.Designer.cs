@@ -453,7 +453,7 @@ namespace DatEditorVDGrid
             this.Controls.Add(this.tableLayoutPanel1);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "Form1";
-            this.Text = "Form1";
+            this.Text = "DatEditorVDGrid";
             this.tableLayoutPanel1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.dgvColumns)).EndInit();
             this.panel1.ResumeLayout(false);

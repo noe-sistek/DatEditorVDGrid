@@ -30,6 +30,7 @@ namespace DatEditorVDGrid
         public Form1()
         {
             InitializeComponent();
+            UpdateWindowTitle(null);
             this.Load += Form1_Load;
         }
 
@@ -38,8 +39,26 @@ namespace DatEditorVDGrid
             _initialFilePath = initialFilePath;
         }
 
+        private void UpdateWindowTitle(string filePath)
+        {
+            string appName = "DatEditorVDGrid";
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                Text = appName;
+                return;
+            }
+
+            string fileName = System.IO.Path.GetFileName(filePath);
+            Text = string.IsNullOrWhiteSpace(fileName) ? appName : $"{fileName} - {appName}";
+        }
+
         private void Form1_Load(object sender, EventArgs e)
         {
+            if (!string.IsNullOrWhiteSpace(_initialFilePath))
+            {
+                UpdateWindowTitle(_initialFilePath);
+            }
+
             // Enable double buffering for DataGridView to eliminate flickering on scroll/paint
             typeof(DataGridView).InvokeMember(
                 "DoubleBuffered",

@@ -486,6 +486,8 @@ namespace DatEditorVDGrid
                 col.Width = Math.Max(col.MinimumWidth, col.Width + padding);
                 col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             }
+            UpdateWindowTitle(fileToLoad);
+
             // set status text and resize label to fit filename
             lblStatus.Text = "ArchivoImportado: " + System.IO.Path.GetFileName(fileToLoad);
 
